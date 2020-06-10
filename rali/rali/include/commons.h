@@ -41,7 +41,8 @@ enum class RaliTensorFormat
 enum class RaliTensorDataType
 {
     FP32 = 0,
-    FP16
+    FP16,
+    INT8
 };
 enum class RaliAffinity
 {
