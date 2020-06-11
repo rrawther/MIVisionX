@@ -25,15 +25,17 @@ THE SOFTWARE.
 #include <memory>
 #include "graph.h"
 #include "image.h"
+
 class Node
 {
 public:
+    Node() {};
     Node(const std::vector<Image *> &inputs, const std::vector<Image *> &outputs) :
-        _inputs(inputs),
-        _outputs(outputs),
-        _batch_size(outputs[0]->info().batch_size()) {}
+            _inputs(inputs),
+            _outputs(outputs),
+            _batch_size(outputs[0]->info().batch_size()) {}
     virtual ~Node();
-    void create(std::shared_ptr<Graph> graph);
+    virtual void create(std::shared_ptr<Graph> graph);
     void update_parameters();
     std::vector<Image*> input() { return _inputs; };
     std::vector<Image*> output() { return _outputs; };

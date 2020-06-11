@@ -448,7 +448,7 @@ raliResize(
         // For the nodes that user provides the output size the dimension of all the images after this node will be fixed and equal to that size
         output->reset_image_roi();
 
-        context->master_graph->add_node<ResizeNode>({input}, {output});
+        context->master_graph->add_node<ResizeNode<Image>>({input}, {output});
     }
     catch(const std::exception& e)
     {

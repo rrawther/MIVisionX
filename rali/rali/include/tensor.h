@@ -73,6 +73,7 @@ struct TensorInfo
     unsigned height() const { return _height; }
     unsigned channels() const { return _channels; }
     unsigned stride() const { return _stride; }
+    unsigned height_single() const { return _height;}
     void width(unsigned width) { _width = width; }
     void height(unsigned height) { _height = height; }
     Type type() const { return _type; }
