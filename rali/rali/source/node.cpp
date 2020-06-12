@@ -21,6 +21,7 @@ THE SOFTWARE.
 */
 
 #include "node.h"
+
 Node::~Node()
 {
 
@@ -69,3 +70,4 @@ Node::update_src_roi()
     if(width_status != 0 || height_status != 0)
         THROW(" Failed calling vxCopyArrayRange for width / height status : "+ TOSTR(width_status) + " / "+ TOSTR(height_status))
 }
+
