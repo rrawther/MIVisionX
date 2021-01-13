@@ -58,6 +58,7 @@ list(APPEND SOURCES
 	ago/ago_haf_cpu_fast_corners.cpp
 	ago/ago_haf_cpu_filter.cpp
 	ago/ago_haf_cpu_geometric.cpp
+	ago/ago_haf_cpu_generic_functions.cpp
 	ago/ago_haf_cpu_harris.cpp
 	ago/ago_haf_cpu_histogram.cpp
 	ago/ago_haf_cpu_logical.cpp
@@ -113,7 +114,7 @@ elseif ("${BACKEND}" STREQUAL "HIP" AND HIP_FOUND )
     link_directories(${ROCM_PATH}/mivisionx/lib ${HIP_PATH}/lib)
     target_link_libraries (openvx openvx_hip)
     message("-- ${Green}AMD OpenVX -- OpenVX built with HIP Support${ColourReset}")
-    install(TARGETS openvx_hip DESTINATION lib)
+    # install(TARGETS openvx_hip DESTINATION lib)
 else()
     add_library(openvx SHARED ${SOURCES})
     add_library(vxu SHARED api/vxu.cpp)

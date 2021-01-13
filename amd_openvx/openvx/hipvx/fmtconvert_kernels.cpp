@@ -27,33 +27,29 @@ THE SOFTWARE.
 #include "hip/hip_runtime.h"
 #include "hip_kernels.h"
 
-__device__ __forceinline__ float4 ucharTofloat4(unsigned int src)
-{
+__device__ __forceinline__ float4 ucharTofloat4(unsigned int src) {
     return make_float4((float)(src&0xFF), (float)((src&0xFF00)>>8), (float)((src&0xFF0000)>>16), (float)((src&0xFF000000)>>24));
 }
 
-__device__ __forceinline__ uint float4ToUint(float4 src)
-{
+__device__ __forceinline__ uint float4ToUint(float4 src) {
   return ((int)src.x&0xFF) | (((int)src.y&0xFF)<<8) | (((int)src.z&0xFF)<<16)| (((int)src.w&0xFF) << 24);
 }
 
 // VxAbsDiff kernel for hip backend
 __global__ void __attribute__((visibility("default")))
-Hip_Copy_U8_U8
-	(
+Hip_Copy_U8_U8 (
         vx_uint32     dstWidth,
         vx_uint32     dstHeight,
         unsigned int     * pDstImage,
         unsigned int     dstImageStrideInBytes,
         const unsigned int    * pSrcImage,
         vx_uint32     srcImageStrideInBytes
-	)
-{
+	) {
     int x = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     int y = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
     if ((x*8 >= dstWidth) || (y >= dstHeight)) return;
-    unsigned int dstIdx =  y*(dstImageStrideInBytes>>2) + x;
-    unsigned int srcIdx =  y*(srcImageStrideInBytes>>2) + x;
+    unsigned int dstIdx =  y*(dstImageStrideInBytes>>2) + (x*2);
+    unsigned int srcIdx =  y*(srcImageStrideInBytes>>2) + (x*2);
     pDstImage[dstIdx] = pSrcImage[srcIdx];
     pDstImage[dstIdx+1] = pSrcImage[srcIdx+1];
 }
@@ -71,14 +67,13 @@ int HipExec_ChannelCopy
 {
     int localThreads_x = 16, localThreads_y = 16;
     int globalThreads_x = (dstWidth + 7) >> 3, globalThreads_y = dstHeight;
-    hipEvent_t start, stop; float eventMs;
-    HIP_KERNEL_TIMING_START(start, stop, eventMs)
+
     hipLaunchKernelGGL(Hip_Copy_U8_U8,
                        dim3(ceil((float) globalThreads_x / localThreads_x), ceil((float) globalThreads_y / localThreads_y)),
                        dim3(localThreads_x, localThreads_y),
                        0, stream, dstWidth, dstHeight,
                        (unsigned int *) pHipDstImage, dstImageStrideInBytes, (const unsigned int *) pHipSrcImage,
                        srcImageStrideInBytes);
-    HIP_KERNEL_TIMING_STOP(start, stop, eventMs)
+
     return VX_SUCCESS;
 }
