@@ -225,11 +225,17 @@ int agoGpuHipAllocBuffer(AgoData * data)
         hipError_t err = hipSuccess;
         if (!data->hip_memory) {
             if (data->u.lut.type == VX_TYPE_UINT8) {
-                // todo:: allocate HIP 2D array
+                // todo:: allocating normal hip memory. OpenCL allocates 1D image. Check if this is needed.
                 data->opencl_buffer_offset = 0;
+                agoGpuHipCreateBuffer(context, (void **)&data->hip_memory, data->size + data->opencl_buffer_offset, err);
+                data->hip_memory_allocated = data->hip_memory;
+                if (err) {
+                    agoAddLogEntry(&context->ref, VX_FAILURE, "ERROR: agoGpuHipAllocBuffer(MEM_READ_WRITE,%d,0,*) FAILED\n", (int)data->size + data->opencl_buffer_offset);
+                    return -1;
+                }
             }
             else {
-                // normal opencl_buffer allocation
+                // normal Hip memory allocation
                 data->hip_memory = 0;
                 agoGpuHipCreateBuffer(context, (void **)&data->hip_memory, data->size + data->opencl_buffer_offset, err);
                 data->hip_memory_allocated = data->hip_memory;
@@ -425,10 +431,10 @@ static int agoGpuHipDataInputSync(AgoGraph * graph, AgoData * data, vx_uint32 da
                 if (!(data->buffer_sync_flags & AGO_BUFFER_SYNC_FLAG_DIRTY_SYNCHED)) {
                     if (data->buffer_sync_flags & (AGO_BUFFER_SYNC_FLAG_DIRTY_BY_NODE | AGO_BUFFER_SYNC_FLAG_DIRTY_BY_COMMIT)) {
                         int64_t stime = agoGetClockCounter();
-                        if (data->u.lut.type == VX_TYPE_UINT8 && data->hip_memory) {
-                            hipError_t err = hipMemcpy2D(data->hip_memory, 1, data->buffer, 256, 256, 1, hipMemcpyHostToDevice);
+                        if (data->u.lut.type == VX_TYPE_UINT8 && data->hip_memory && data->size >0) {
+                            hipError_t err = hipMemcpyHtoD(data->hip_memory + data->opencl_buffer_offset, data->buffer, data->size);
                             if (err) {
-                                agoAddLogEntry(&data->ref, VX_FAILURE, "ERROR: hipMemcpy2D(lut) => %d\n", err);
+                                agoAddLogEntry(&data->ref, VX_FAILURE, "ERROR: agoGpuOclDataInputSync: hipMemcpyHtoD() => %d (for LUT)\n", err);
                                 return -1;
                             }
                         }
@@ -783,7 +789,6 @@ int agoGpuHipSingleNodeLaunch(AgoGraph * graph, AgoNode * node)
     float eventMs = 1.0f;
     AgoKernel * kernel = node->akernel;
     vx_status status = VX_SUCCESS;
-    hipEventRecord(node->hip_event_start, graph->hip_stream0);
     if (kernel->func) {
         status = kernel->func(node, ago_kernel_cmd_hip_execute);
         if (status == AGO_ERROR_KERNEL_NOT_IMPLEMENTED)
@@ -803,8 +808,6 @@ int agoGpuHipSingleNodeLaunch(AgoGraph * graph, AgoNode * node)
             return -1;
         }
     }
-    hipEventRecord(node->hip_event_stop, graph->hip_stream0);
-    hipEventElapsedTime(&eventMs, node->hip_event_start, node->hip_event_stop);
     graph->opencl_perf.kernel_enqueue += eventMs;
 
     // mark that node outputs are dirty
@@ -833,7 +836,6 @@ int agoGpuHipSuperNodeLaunch(AgoGraph * graph, AgoSuperNode * supernode)
 #if 0
     AgoKernel * kernel = supernode->akernel;
     status = VX_SUCCESS;
-    hipEventRecord(supernode->hip_event_start, graph->hip_stream0);
     if (kernel->func) {
         status = kernel->func(supernode, ago_kernel_cmd_execute);
         if (status == AGO_ERROR_KERNEL_NOT_IMPLEMENTED)
@@ -873,8 +875,6 @@ int agoGpuHipSingleNodeWait(AgoGraph * graph, AgoNode * node)
 {
     // wait for completion
     float eventMs = 1.0f;
-    hipEventSynchronize(node->hip_event_stop);
-    hipEventElapsedTime(&eventMs, node->hip_event_start, node->hip_event_stop);
     graph->opencl_perf.kernel_wait += eventMs;
     // sync the outputs
     for (size_t index = 0; index < node->paramCount; index++) {
