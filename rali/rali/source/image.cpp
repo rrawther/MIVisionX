@@ -20,7 +20,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 #include <cstdio>
+#if !ENABLE_HIP
 #include <CL/cl.h>
+#endif
 #include <vx_ext_amd.h>
 #include <cstring>
 #include "commons.h"
@@ -285,6 +287,7 @@ int Image::create(vx_context context)
     return 0;
 }
 
+#if !ENABLE_HIP
 unsigned Image::copy_data(cl_command_queue queue, unsigned char* user_buffer, bool sync)
 {
     if(_info._type != ImageInfo::Type::HANDLE)
@@ -308,25 +311,52 @@ unsigned Image::copy_data(cl_command_queue queue, unsigned char* user_buffer, bo
             THROW("clEnqueueReadBuffer failed: " + TOSTR(status))
 
     }
-#if ENABLE_HIP     
-    else if (_info._mem_type == RaliMemType::HIP)
-    {
-        // copy from device to host
-        hipError_t status;
-        if (status = hipMemcpyDtoH((void *)user_buffer, _mem_handle, size))
-            THROW("copy_data::hipMemcpyDtoH failed: " + TOSTR(status))
-    }
-#endif
     else
     {
         memcpy(user_buffer, _mem_handle, size);
     }
     return size;
 }
+
 unsigned Image::copy_data(cl_command_queue queue, cl_mem user_buffer, bool sync)
 {
     return 0;
 }
+#else
+unsigned Image::copy_data(hipStream_t stream, unsigned char* user_buffer, bool sync)
+{
+    if(_info._type != ImageInfo::Type::HANDLE)
+        return 0;
+
+    unsigned size = _info.width() *
+                    _info.height_batch() *
+                    _info.color_plane_count();
+
+    if (_info._mem_type == RaliMemType::HIP)
+    {
+        // copy from device to host
+        hipError_t status;
+        if ((status = hipMemcpyDtoHAsync((void *)user_buffer, _mem_handle, size, stream)))
+            THROW("copy_data::hipMemcpyDtoHAsync failed: " + TOSTR(status))
+        if (sync) {
+            if ((status =hipStreamSynchronize(stream)))
+                THROW("copy_data::hipStreamSynchronize failed: " + TOSTR(status))
+        }
+
+    }
+    else
+    {
+        memcpy(user_buffer, _mem_handle, size);
+    }
+    return size;
+}
+unsigned Image::copy_data(hipStream_t stream, void* hip_memory, bool sync)
+{
+    // todo:: copy from host to device
+    return 0;
+}
+
+#endif
 
 int Image::swap_handle(void* handle)
 {

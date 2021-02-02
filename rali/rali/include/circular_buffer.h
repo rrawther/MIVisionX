@@ -23,7 +23,9 @@ THE SOFTWARE.
 #pragma once
 #include <vector>
 #include <condition_variable>
+#if !ENABLE_HIP
 #include <CL/cl.h>
+#endif
 #include <queue>
 #include "device_manager.h"
 #include "device_manager_hip.h"
@@ -75,9 +77,15 @@ private:
      *  Pinned memory allocated on the host used for fast host to device memory transactions,
      *  or the regular host memory buffers in the host processing case.
      */
+#if !ENABLE_HIP
     cl_command_queue _cl_cmdq = nullptr;
     cl_context _cl_context = nullptr;
-    cl_device_id _device_id = nullptr;    
+    cl_device_id _device_id = nullptr;
+#else    
+    hipStream_t _hip_stream;
+    int _hip_device_id;
+    hipDeviceProp_t *_dev_prop;
+#endif
     std::vector<void *> _dev_buffer;// Actual memory allocated on the device (in the case of GPU affinity)
     std::vector<unsigned char*> _host_buffer_ptrs;
     std::vector<std::vector<unsigned char>> _actual_host_buffers;
@@ -91,9 +99,4 @@ private:
     size_t _write_ptr;
     size_t _read_ptr;
     size_t _level;
-#if ENABLE_HIP
-    hipStream_t _hip_stream;
-    int _hip_device_id;
-    hipDeviceProp_t *_dev_prop;
-#endif
 };

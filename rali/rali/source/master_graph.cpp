@@ -20,7 +20,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if !ENABLE_HIP
 #include <CL/cl.h>
+#endif
 #include <vx_ext_amd.h>
 #include <VX/vx_types.h>
 #include <cstring>
@@ -118,6 +120,7 @@ MasterGraph::MasterGraph(size_t batch_size, RaliAffinity affinity, int gpu_id, s
 
         if(affinity == RaliAffinity::GPU)
         {
+#if !ENABLE_HIP             
             if (_mem_type == RaliMemType::OCL){
                 cl_context _cl_context = nullptr;
                 cl_device_id _cl_device_id = nullptr;
@@ -127,8 +130,8 @@ MasterGraph::MasterGraph(size_t batch_size, RaliAffinity affinity, int gpu_id, s
                         &_cl_context, sizeof(cl_context)) != VX_SUCCESS))
                     THROW("vxSetContextAttribute for CL_CONTEXT failed " + TOSTR(status))
             }
-#if ENABLE_HIP             
-            else {
+#else             
+            if (_mem_type == RaliMemType::HIP){
                 hipError_t err = hipInit(0);
                 if (err != hipSuccess) {
                     THROW("ERROR: hipInit(0) => %d (failed)" + TOSTR(err));
@@ -404,9 +407,10 @@ MasterGraph::allocate_output_tensor()
 MasterGraph::Status
 MasterGraph::deallocate_output_tensor()
 {
+#if !ENABLE_HIP
     if(processing_on_device_ocl() && _output_tensor != nullptr)
         clReleaseMemObject((cl_mem)_output_tensor );
-#if ENABLE_HIP
+#else
     if(processing_on_device_hip() && _output_tensor != nullptr) {
         hipFree(_output_tensor );
         _output_tensor = nullptr;
@@ -460,7 +464,7 @@ MasterGraph::timing()
 
 MasterGraph::Status
 MasterGraph::copy_output(
-        cl_mem out_ptr,
+        void* out_ptr,
         size_t out_size)
 {
     if(no_more_processed_data())

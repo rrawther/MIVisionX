@@ -52,7 +52,8 @@ public:
     MasterGraph::Status
     copy_out_tensor(void *out_ptr, RaliTensorFormat format, float multiplier0, float multiplier1, float multiplier2,
                     float offset0, float offset1, float offset2, bool reverse_channels, RaliTensorDataType output_data_type);
-    Status copy_output(cl_mem out_ptr, size_t out_size);
+    // copy to device memory                    
+    Status copy_output(void* out_ptr, size_t out_size);
     Status copy_out_tensor_planar(void *out_ptr, RaliTensorFormat format, float multiplier0, float multiplier1, float multiplier2,
                     float offset0, float offset1, float offset2, bool reverse_channels, RaliTensorDataType output_data_type);
     size_t output_width();
@@ -108,7 +109,7 @@ private:
     std::list<std::shared_ptr<Node>> _root_nodes;//!< List of all root nodes (image/video loaders)
     std::list<std::shared_ptr<Node>> _meta_data_nodes;//!< List of nodes where meta data has to be updated after augmentation
     std::map<Image*, std::shared_ptr<Node>> _image_map;//!< key: image, value : Parent node
-#if ENABLE_HIP        
+#if ENABLE_HIP
     void * _output_tensor;//!< In the GPU processing case , is used to convert the U8 samples to float32 before they are being transfered back to host
     DeviceManagerHip   _device;//!< Keeps the device related constructs needed for running on GPU
 #else

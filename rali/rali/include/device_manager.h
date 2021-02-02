@@ -20,8 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if !ENABLE_HIP
 #pragma once
-
 #include <map>
 #include <CL/cl.h>
 #include <vx_ext_amd.h>
@@ -85,3 +85,4 @@ private:
 };
 
 using pRaliOCL = std::shared_ptr<DeviceManager>;
+#endif

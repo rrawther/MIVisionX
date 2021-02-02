@@ -20,6 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if !ENABLE_HIP
 #include <iostream>
 #include <vx_ext_amd.h>
 #include "device_manager.h"
@@ -174,3 +175,4 @@ const CLProgram& DeviceManager::operator[](const std::string& prog_name)
 
     THROW("Requested kernel" + prog_name + "does not exist");
 }
+#endif

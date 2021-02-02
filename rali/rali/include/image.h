@@ -32,8 +32,9 @@ THE SOFTWARE.
 #if ENABLE_HIP
 #include "hip/hip_runtime.h"
 #include "device_manager_hip.h"
-#endif
+#else
 #include "device_manager.h"
+#endif
 #include "commons.h"
 
 
@@ -146,8 +147,13 @@ struct Image
     void* buffer() { return _mem_handle; }
     vx_image handle() { return vx_handle; }
     vx_context context() { return _context; }
+#if !ENABLE_HIP    
     unsigned copy_data(cl_command_queue queue, unsigned char* user_buffer, bool sync);
     unsigned copy_data(cl_command_queue queue, cl_mem user_buffer, bool sync);
+#else
+    unsigned copy_data(hipStream_t stream, unsigned char* user_buffer, bool sync);
+    unsigned copy_data(hipStream_t stream, void* hip_memory, bool sync);
+#endif
     //! Default destructor
     /*! Releases the OpenVX image */
     ~Image();

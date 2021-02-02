@@ -120,8 +120,8 @@ if(${BUILD_RALI})
 		DESTINATION ./include
 		)
 	include_directories(
-			    ${OpenCL_INCLUDE_DIRS}
-			    ${OpenCL_INCLUDE_DIRS}/Headers	
+#			    ${OpenCL_INCLUDE_DIRS}
+#			    ${OpenCL_INCLUDE_DIRS}/Headers	
 				${CMAKE_CURRENT_BINARY_DIR}
 			    ${TurboJpeg_INCLUDE_DIRS}
 				${PROTOBUF_INCLUDE_DIRS}
@@ -149,7 +149,8 @@ if(${BUILD_RALI})
 		target_compile_definitions(${PROJECT_NAME} PRIVATE __HIP_PLATFORM_HCC__)		
 		target_compile_definitions(${PROJECT_NAME} PUBLIC ENABLE_HIP=1)
 	else()
-		target_compile_definitions(${PROJECT_NAME} PUBLIC ENABLE_HIP=0)
+        include_directories(${OpenCL_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS}/Headers)
+        target_compile_definitions(${PROJECT_NAME} PUBLIC ENABLE_HIP=0)
 	endif()		
 
 	target_compile_definitions(${PROJECT_NAME} PUBLIC ENABLE_SIMD=1)
@@ -162,7 +163,7 @@ if(${BUILD_RALI})
 	else()
 		target_compile_definitions(${PROJECT_NAME} PUBLIC ENABLE_OPENCV=0)
 	endif()
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fopenmp -msse4.2 -mavx2 -Wall -ljsoncpp -fPIC -pg -pthread")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fopenmp -msse4.2 -mavx2 -Wall -ljsoncpp -fPIC -pg -pthread -Wno-unused-result")
 	add_definitions(-ljsoncpp)
 	message("-- ${Green}${PROJECT_NAME} - CMAKE_CXX_FLAGS:${CMAKE_CXX_FLAGS}")
 
