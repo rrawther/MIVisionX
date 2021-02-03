@@ -134,12 +134,12 @@ MasterGraph::MasterGraph(size_t batch_size, RaliAffinity affinity, int gpu_id, s
             if (_mem_type == RaliMemType::HIP){
                 hipError_t err = hipInit(0);
                 if (err != hipSuccess) {
-                    THROW("ERROR: hipInit(0) => %d (failed)" + TOSTR(err));
+                    THROW("ERROR: hipInit(0) failed  " + TOSTR(err));
                 }
                 int hip_num_devices = -1;
                 err = hipGetDeviceCount(&hip_num_devices);
                 if (err != hipSuccess) {
-                    THROW("ERROR: hipGetDeviceCount() => %d (failed)" + TOSTR(err));
+                    THROW("ERROR: hipGetDeviceCount() failed) " + TOSTR(err));
                 }
                 if (gpu_id < hip_num_devices) {
                     //set the device forcontext if specified.
@@ -147,7 +147,7 @@ MasterGraph::MasterGraph(size_t batch_size, RaliAffinity affinity, int gpu_id, s
                     if((status = vxSetContextAttribute(_context,
                             VX_CONTEXT_ATTRIBUTE_AMD_HIP_DEVICE,
                             &hipDevice, sizeof(hipDevice)) != VX_SUCCESS))
-                        THROW("vxSetContextAttribute for hipDevice(%d) failed " + TOSTR(hipDevice) + TOSTR(status))
+                        THROW("vxSetContextAttribute for hipDevice failed for device " + TOSTR(hipDevice) + " with status " + TOSTR(status))
                 }
             #if 0    // todo:: fall back to cpu if device not available
                 else {
@@ -182,7 +182,7 @@ MasterGraph::MasterGraph(size_t batch_size, RaliAffinity affinity, int gpu_id, s
 #endif
         if(_affinity == RaliAffinity::GPU) {
 #if ENABLE_HIP
-            _device.init_hip(_context);
+            _device.init_hip(_context, gpu_id);
 #else            
             _device.init_ocl(_context);
 #endif            

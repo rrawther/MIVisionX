@@ -43,7 +43,7 @@ public:
     
     DeviceResourcesHip resources();
 
-    void init_hip(vx_context context);
+    void init_hip(vx_context context, int hip_dev_id);
 
     ~DeviceManagerHip();
 

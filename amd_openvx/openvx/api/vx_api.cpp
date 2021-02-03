@@ -413,6 +413,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetContextAttribute(vx_context context, vx_
 				if (context->hip_device < 0 && agoGpuHipCreateContext(context, context->hip_device) != VX_SUCCESS) {
 					status = VX_FAILURE;
 				}
+                else {
+                    *(int *)ptr = context->hip_device_id;
+                    status = VX_SUCCESS;
+                }
 			}
 			break;
 #endif

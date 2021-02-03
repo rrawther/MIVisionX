@@ -56,11 +56,10 @@ DeviceResourcesHip DeviceManagerHip::resources()
     return _resources;
 }
 
-void DeviceManagerHip::init_hip(vx_context context)
+void DeviceManagerHip::init_hip(vx_context context, int hip_dev_id)
 {
     hipError_t err;
-    hipDevice_t dev_id;
-    vx_status vxstatus = vxQueryContext(context, VX_CONTEXT_ATTRIBUTE_AMD_HIP_DEVICE, &dev_id, sizeof(hipDevice_t));
+    vx_status vxstatus = vxQueryContext(context, VX_CONTEXT_ATTRIBUTE_AMD_HIP_DEVICE, &hip_dev_id, sizeof(int));
 
     if (vxstatus != VX_SUCCESS)
         THROW("init_hip::vxQueryContext failed " + TOSTR(vxstatus))
@@ -70,12 +69,12 @@ void DeviceManagerHip::init_hip(vx_context context)
     if (err != hipSuccess) {
         THROW("init_hip::hipStreamCreate failed " + TOSTR(err))
     }
-    err = hipGetDeviceProperties(&_resources.dev_prop, dev_id);
+    err = hipGetDeviceProperties(&_resources.dev_prop, hip_dev_id);
     if (err != hipSuccess) {
         THROW("init_hip::hipGetDeviceProperties failed " + TOSTR(err))
     }
     _resources.hip_stream = stream;
-    _resources.device_id = dev_id;
+    _resources.device_id = hip_dev_id;
     initialize();
     LOG("RALI HIP initialized ...")
 }
