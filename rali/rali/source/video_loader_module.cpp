@@ -39,21 +39,78 @@ VideoLoaderModule::set_output_image (Image* output_image)
 {
 }
 
-void
-VideoLoaderModule::initialize(ReaderConfig reader_cfg, DecoderConfig decoder_cfg, RaliMemType mem_type, unsigned batch_size)
+void 
+VideoLoaderModule::de_init()
 {
+    _batch_size = 1;
+    _is_initialized = false;
+    _remaining_count = 0;
 }
 
-size_t VideoLoaderModule::count()
+
+void
+VideoLoaderModule::initialize(ReaderConfig reader_config, DecoderConfig decoder_config, RaliMemType mem_type, unsigned batch_size, bool keep_orig_size)
+{
+    // initialize video reader.
+    try
+    {
+        _reader = create_reader(reader_config);
+    }
+    catch(const std::exception& e)
+    {
+        de_init();
+        throw;
+    }
+
+    for (unsigned int i=0 ; i < batch_size; i++)
+      _output_names.push_back("-1");
+
+    _is_initialized = true;
+    LOG("VideoLoaderModule initialized");
+}
+
+size_t VideoLoaderModule::remaining_count()
 {
     // TODO: use FFMPEG to find the total number of frames and keep counting 
     // how many times laod_next() is called successfully, subtract them and 
     // that would be the count of frames remained to be decoded
-    return 9999999;
+    return 9999;
+}
+
+// return ids of last batch of videos loaded
+std::vector<std::string> VideoLoaderModule::get_id()
+{
+    // todo::
+    // for now get _output_names from video node
+    if (_video_node) {
+        _output_names = _video_node->get_output_names();
+        return _output_names;
+    }else
+    {
+        return {};
+    }
 }
 
 void VideoLoaderModule::reset()
 {
     // Functionality not there yet in the OpenVX API
 }
+
+decoded_image_info VideoLoaderModule::get_decode_image_info()
+{
+    // todo:: this is invalid structure retirned
+    return _output_decoded_img_info;
+}
+
+
+Timing VideoLoaderModule::timing()
+{
+    Timing t;
+    //t.image_read_time = _file_load_time.get_timing();
+    //t.image_process_time = _swap_handle_time.get_timing();
+    t.image_read_time = 0;
+    t.image_process_time = 0;
+    return t;
+}
+
 #endif

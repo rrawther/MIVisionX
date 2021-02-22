@@ -32,7 +32,8 @@ Node::~Node()
 void
 Node::create(std::shared_ptr<Graph> graph)
 {
-    if(_outputs.empty() || _inputs.empty())
+    // input images can be empty for video node
+    if(_outputs.empty() /*|| _inputs.empty()*/)
         THROW("Uninitialized input/output images to the node")
 
     _graph = graph;
@@ -63,9 +64,11 @@ Node::update_parameters()
 void
 Node::update_src_roi()
 {
-    vx_status width_status, height_status;
-    width_status = vxCopyArrayRange((vx_array)_src_roi_width, 0, _batch_size, sizeof(vx_uint32), _inputs[0]->info().get_roi_width(), VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST);
-    height_status = vxCopyArrayRange((vx_array)_src_roi_height, 0, _batch_size, sizeof(vx_uint32), _inputs[0]->info().get_roi_height(), VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST);
-    if(width_status != 0 || height_status != 0)
-        THROW(" Failed calling vxCopyArrayRange for width / height status : "+ TOSTR(width_status) + " / "+ TOSTR(height_status))
+    if(!_inputs.empty()) {
+        vx_status width_status, height_status;
+        width_status = vxCopyArrayRange((vx_array)_src_roi_width, 0, _batch_size, sizeof(vx_uint32), _inputs[0]->info().get_roi_width(), VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST);
+        height_status = vxCopyArrayRange((vx_array)_src_roi_height, 0, _batch_size, sizeof(vx_uint32), _inputs[0]->info().get_roi_height(), VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST);
+        if(width_status != 0 || height_status != 0)
+            THROW(" Failed calling vxCopyArrayRange for width / height status : "+ TOSTR(width_status) + " / "+ TOSTR(height_status))
+    }
 }

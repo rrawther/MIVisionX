@@ -669,7 +669,7 @@ void CLoomIoMediaDecoder::DecodeLoop(int mediaIndex)
             gotPicture = true;
             if (useVaapi[mediaIndex]) {
                 /* retrieve data from GPU to CPU */
-                if ((status = av_hwframe_transfer_data(sw_frame, frame, 0)) < 0) {
+                if ((status = (sw_frame, frame, 0)) < 0) {
                     vxAddLogEntry((vx_reference)node, VX_FAILURE, "ERROR: avcodec_receive_frame() failed (%x)\n", AVERROR(status));
                     eof[mediaIndex] = true;
                     PushAck(mediaIndex, -1);

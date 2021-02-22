@@ -65,6 +65,17 @@ auto get_ago_affinity_info = []
     return affinity;
 };
 
+static void VX_CALLBACK log_callback(vx_context context, vx_reference ref, vx_status status, const vx_char string[])
+{
+    size_t len = strlen(string);
+    if (len > 0) {
+        printf("%s", string);
+        if (string[len - 1] != '\n')
+            printf("\n");
+        fflush(stdout);
+    }
+}
+
 MasterGraph::~MasterGraph()
 {
     release();
@@ -89,6 +100,7 @@ MasterGraph::MasterGraph(size_t batch_size, RaliAffinity affinity, int gpu_id, s
     try {
         vx_status status;
         _context = vxCreateContext();
+        vxRegisterLogCallback(_context, log_callback, vx_false_e);
         auto vx_affinity = get_ago_affinity_info(_affinity, 0, gpu_id);
         if ((status = vxGetStatus((vx_reference) _context)) != VX_SUCCESS)
             THROW("vxCreateContext failed" + TOSTR(status))
@@ -725,7 +737,7 @@ void MasterGraph::output_routine()
                     break;
 
                 auto this_cycle_names =  _loader_module->get_id();
-                auto decode_image_info = _loader_module->get_decode_image_info();                
+                auto decode_image_info = _loader_module->get_decode_image_info();
 
                 if(this_cycle_names.size() != _internal_batch_size)
                     WRN("Internal problem: names count "+ TOSTR(this_cycle_names.size()))
@@ -777,8 +789,9 @@ void MasterGraph::output_routine()
                         full_batch_meta_data = _augmented_meta_data->clone();
                 }
                 _process_time.start();
-                _graph->process();
+                auto graph_status = _graph->process();
                 _process_time.end();
+                if ( graph_status != Graph::Status::NO_MORE_DATA) break;
             }
 
             _ring_buffer.set_meta_data(full_batch_image_names, full_batch_meta_data);

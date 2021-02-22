@@ -90,17 +90,21 @@ Graph::verify()
     if((status = vxVerifyGraph(_graph)) != VX_SUCCESS) 
         THROW("vxVerifyGraph failed " + TOSTR(status))
 
-    return Status::OK;    
+    return Status::OK;
 }
 
 Graph::Status
 Graph::process()
 {
     vx_status status;
-    if((status = vxProcessGraph(_graph)) != VX_SUCCESS) 
-         THROW("ERROR: vxProcessGraph failed " + TOSTR(status))
+    if((status = vxProcessGraph(_graph)) != VX_SUCCESS){
+        if (status == VX_ERROR_GRAPH_ABANDONED)
+            return Status::NO_MORE_DATA;
+        else
+           THROW("ERROR: vxProcessGraph failed " + TOSTR(status))
+    }
 
-    return  Status::OK;    
+    return  Status::OK;
 }
 
 Graph::Status

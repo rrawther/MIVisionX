@@ -1184,7 +1184,7 @@ raliVideoFileSource(
 
         output = context->master_graph->create_image(info, is_output);
 
-        context->master_graph->add_node<VideoFileNode>({}, {output}, context->batch_size)->init( source_path,decoder_mode, loop);
+        context->master_graph->add_node<VideoFileNode>({}, {output})->init( source_path,decoder_mode, loop, context->user_batch_size());
         context->master_graph->set_loop(loop);
 #else
         THROW("Video decoder is not enabled since amd media decoder is not present")

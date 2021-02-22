@@ -36,6 +36,8 @@ THE SOFTWARE.
 #include "node_cifar10_loader.h"
 #include "meta_data_reader.h"
 #include "meta_data_graph.h"
+#include "video_loader_module.h"
+#include "node_video_file_source.h"
 
 class MasterGraph
 {
@@ -236,7 +238,7 @@ template<> inline std::shared_ptr<Cifar10LoaderNode> MasterGraph::add_node(const
 /*
  * Explicit specialization for VideoFileNode
  */
-template<> inline std::shared_ptr<VideoFileNode> MasterGraph::add_node(const std::vector<Image*>& inputs, const std::vector<Image*>& outputs, const size_t batch_size)
+template<> inline std::shared_ptr<VideoFileNode> MasterGraph::add_node(const std::vector<Image*>& inputs, const std::vector<Image*>& outputs)
 {
     if(_loader_module)
         THROW("A loader already exists, cannot have more than one loader")

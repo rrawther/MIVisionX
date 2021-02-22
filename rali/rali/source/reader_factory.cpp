@@ -29,6 +29,7 @@ THE SOFTWARE.
 #include "tf_record_reader.h"
 #include "caffe_lmdb_record_reader.h"
 #include "caffe2_lmdb_record_reader.h"
+#include "video_reader.h"
 
 std::shared_ptr<Reader> create_reader(ReaderConfig config) {
     switch(config.type()) {
@@ -80,6 +81,16 @@ std::shared_ptr<Reader> create_reader(ReaderConfig config) {
             return ret;
         }
         break;
+#ifdef RALI_VIDEO
+        case StorageType::VIDEO_FILE_SYSTEM:
+        {
+            auto ret = std::make_shared<VideoReader>();
+            if(ret->initialize(config) != Reader::Status::OK)
+                throw std::runtime_error("Caffe2LMDBRecordReader cannot access the storage");
+            return ret;
+        }
+        break;
+#endif        
         default:
             throw std::runtime_error ("Reader type is unsupported");
     }

@@ -29,7 +29,7 @@ THE SOFTWARE.
 class Graph
 {
 public:
-    enum class Status { OK = 0 };
+    enum class Status { OK = 0, NOT_RUNNING = 1, NO_MORE_DATA = 2};
     Graph(vx_context context, RaliAffinity affinity, int cpu_id = 0, int gpu_id = 0 );
     Status verify();
     Status process();
