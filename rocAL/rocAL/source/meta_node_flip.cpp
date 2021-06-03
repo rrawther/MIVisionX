@@ -58,26 +58,28 @@ void FlipMetaNode::update_parameters(MetaDataBatch* input_meta_data)
             box.h = coords_buf[m++];
             if(_flip_axis_val[i] == 0)
             {
-                float centre_x = _src_width_val[i] / 2;
-                box.x += ((centre_x - box.x) * 2) - box.w;
+              box.x = 1.0 - box.w;
+              box.w = 1.0 - box.x;
             }
             else if(_flip_axis_val[i] == 1)
             {
-                float centre_y = _src_height_val[i] / 2;
-                box.y += ((centre_y - box.y) * 2) - box.h;
-
+              box.y = 1.0 - box.h;
+              box.h = 1.0 - box.y;
             }
             bb_coords.push_back(box);
             bb_labels.push_back(labels_buf[j]);
         }
+#if 0        
         if(bb_coords.size() == 0)
         {
+            //std::cout<<"Invalid boxes in FlipMetaNode" << std::endl;
             BoundingBoxCord temp_box;
             temp_box.x = temp_box.y = temp_box.w = temp_box.h = 0;
             bb_coords.push_back(temp_box);
             bb_labels.push_back(0);
         }
+#endif        
         input_meta_data->get_bb_cords_batch()[i] = bb_coords;
-        input_meta_data->get_bb_labels_batch()[i] = bb_labels;
+        //input_meta_data->get_bb_labels_batch()[i] = bb_labels;    // no need to do this since labels are not changed
     }
 }

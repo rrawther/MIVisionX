@@ -91,11 +91,11 @@ void CropMirrorNormalizeMetaNode::update_parameters(MetaDataBatch* input_meta_da
         }
         if(bb_coords.size() == 0)
         {
-	        //std::cout << "Crop mirror Normalize - Zero Bounding boxes" << std::endl;
+	          //std::cout << "Crop mirror Normalize - Zero Bounding boxes" << std::endl;
             temp_box.x = 0;
             temp_box.y = 0;
-	        temp_box.w =  crop_box.w - 1;
-	        temp_box.h =  crop_box.h - 1;
+	          temp_box.w =  crop_box.w - 1;
+	          temp_box.h =  crop_box.h - 1;
             bb_coords.push_back(temp_box);
             bb_labels.push_back(0);
         }

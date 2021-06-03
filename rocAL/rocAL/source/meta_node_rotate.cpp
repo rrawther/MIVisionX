@@ -29,6 +29,7 @@ void RotateMetaNode::initialize()
 }
 void RotateMetaNode::update_parameters(MetaDataBatch* input_meta_data)
 {
+    std::cout << "RotateMetaNode::update_paramaters called" << std::endl;
     initialize();
     if(_batch_size != input_meta_data->size())
     {

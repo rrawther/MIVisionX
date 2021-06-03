@@ -788,7 +788,6 @@ void MasterGraph::output_routine()
                 _graph->process();
                 _process_time.end();
             }
-
             _ring_buffer.set_meta_data(full_batch_image_names, full_batch_meta_data);
             _ring_buffer.push(); // Image data and metadata is now stored in output the ring_buffer, increases it's level by 1
 

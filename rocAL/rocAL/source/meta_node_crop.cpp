@@ -30,6 +30,7 @@ void CropMetaNode::initialize()
 }
 void CropMetaNode::update_parameters(MetaDataBatch* input_meta_data)
 {
+    std::cout << "CropMetaNode::update_paramaters called" << std::endl;
     initialize();
     if(_batch_size != input_meta_data->size())
     {

@@ -156,9 +156,13 @@ void RandomBBoxCropReader::read_all()
         std::string image_name = elem.first;
         BoundingBoxCords bb_coords = elem.second->get_bb_cords();
         ImgSizes img_sizes = elem.second->get_img_sizes();
+        BoundingBoxLabels bb_labels = elem.second->get_bb_labels();
         in_width = img_sizes[0].w;
         in_height = img_sizes[0].h;
         bb_count = bb_coords.size();
+        int labels_buf[bb_count];     //for storing output
+        BoundingBoxCords bb_coords_out;    // output
+        BoundingBoxLabels bb_labels_out;
         while (true)
         {
             crop_success = false;
@@ -190,16 +194,22 @@ void RandomBBoxCropReader::read_all()
                 std::uniform_real_distribution<float> l_dis(0.0, 1.0 - width_factor), t_dis(0.0, 1.0-height_factor);
                 float x_factor = l_dis(_rngs[sample]);
                 float y_factor = t_dis(_rngs[sample]);
-                crop_box.x = x_factor*in_width;
-                crop_box.y = y_factor*in_height;
-                crop_box.w = width_factor*in_width;
-                crop_box.h = height_factor*in_height;
-                //std::cout << "random crop params < option, xfactor, yfactor, wf, hf>: " << sample_option << " " << x_factor << " " << y_factor << " " << width_factor << " " << height_factor << std::endl;
+                //crop_box.x = x_factor*in_width;
+                //crop_box.y = y_factor*in_height;
+                //crop_box.w = width_factor*in_width;
+                //crop_box.h = height_factor*in_height;
+                crop_box.x = x_factor;
+                crop_box.y = y_factor;
+                crop_box.w = width_factor;
+                crop_box.h = height_factor;
                 // All boxes should satisfy IOU criteria
                 if (_all_boxes_overlap)
                 {
                     for (uint j = 0; j < bb_count; j++)
                     {
+                        BoundingBoxCord box;
+                        box.x = bb_coords[j].x/in_width, box.y = bb_coords[j].y/in_height;
+                        box.w = bb_coords[j].w/in_width, box.h = bb_coords[j].w/in_height;  
                         float bb_iou = ssd_BBoxIntersectionOverUnion(bb_coords[j], crop_box, true);
                         if (bb_iou < min_iou)
                         {
@@ -220,10 +230,27 @@ void RandomBBoxCropReader::read_all()
                 valid_bbox_count = 0;
                 for (uint j = 0; j < bb_count; j++)
                 {
-                    auto x_c = bb_coords[j].x + 0.5f *bb_coords[j].w;
-                    auto y_c = bb_coords[j].y + 0.5f *bb_coords[j].h;
+                    auto x_c = (bb_coords[j].x + 0.5f *bb_coords[j].w)/in_width;
+                    auto y_c = (bb_coords[j].y + 0.5f *bb_coords[j].h)/in_height;
                     if ((x_c > crop_box.x) && (x_c < right) && (y_c > crop_box.y) && (y_c < bottom))
                     {
+                        // add bbox in lrtb format to output
+                        double bb_left, bb_top, bb_right, bb_bot;
+                        BoundingBoxCord box;
+                        bb_left = (bb_coords[j].x)/in_width;
+                        bb_top = (bb_coords[j].y)/in_height;
+                        bb_right = (bb_coords[j].x + bb_coords[j].w)/in_width;
+                        bb_bot = (bb_coords[j].y + bb_coords[j].h)/in_height;
+                        bb_left = (bb_left - crop_box.x) / crop_box.w; 
+                        bb_top = (bb_top - crop_box.y) / crop_box.h; 
+                        bb_right = (bb_right - crop_box.x) / crop_box.w; 
+                        bb_bot = (bb_bot - crop_box.y) / crop_box.h;
+                        box.x = std::min(std::max(bb_left, 0.0), 1.0); 
+                        box.y = std::min(std::max(bb_top, 0.0), 1.0); 
+                        box.w = std::min(std::max(bb_right, 0.0), 1.0); 
+                        box.h = std::min(std::max(bb_bot, 0.0), 1.0); 
+                        bb_coords_out.push_back(box);
+                        bb_labels_out.push_back(bb_labels[j]);
                         valid_bbox_count++;
                     }
                 }
@@ -231,6 +258,15 @@ void RandomBBoxCropReader::read_all()
                     break;
 
                 crop_success = true;
+                // todo:: store bboxes in lrtb format
+                /*
+                for (all valid bboxes inside cropped region) {
+                  // calculate lrtb box.r = box.x + w, box.b = box.y + h, (box.l, box.r) /= in_width (box.t, box.b) /= in_height
+                  // clip all the boxes to crop boundary
+                  // (box.l, box.r) = ((box.l,box.r)-crop.x)/w_factor, (box.t, box.b) = ((box.t,box.b)-crop.y)/h_factor
+                  // store back into  
+                }
+                */
                 break;
             }
 
@@ -238,7 +274,7 @@ void RandomBBoxCropReader::read_all()
                 break;
         } // while loop
 
-//        std::cout << image_name << " wxh: " << in_width << "X" << in_height << " crop<x,y, w, h>: " << crop_box.x << " X " << crop_box.y << " X " << crop_box.w << " X " << crop_box.h << std::endl;  
+        std::cout << image_name << " wxh: " << in_width << "X" << in_height << " crop<x,y, w, h>: " << crop_box.x << " X " << crop_box.y << " X " << crop_box.w << " X " << crop_box.h << std::endl;  
         add(image_name, crop_box);
         sample++;
     }

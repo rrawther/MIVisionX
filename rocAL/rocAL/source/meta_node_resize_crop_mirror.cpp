@@ -32,6 +32,7 @@ void ResizeCropMirrorMetaNode::initialize()
 
 void ResizeCropMirrorMetaNode::update_parameters(MetaDataBatch* input_meta_data)
 {
+    std::cout << "CropResizeMetaNode::update_paramaters called" << std::endl;
     initialize();
     if(_batch_size != input_meta_data->size())
     {
