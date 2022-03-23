@@ -22,19 +22,18 @@ THE SOFTWARE.
 
 #pragma once
 #include <vector>
+#include <condition_variable>
 #include <string>
 #include <memory>
-#include <dirent.h>
-#include <map>
-#include <iterator>
-#include <algorithm>
-#include <fstream>
+#include <queue>
 #include "reader.h"
+#include "commons.h"
 #include "timing_debug.h"
 
-class MXNetRecordIOReader : public Reader{
+#if 1
+class ExternalSourceReader : public Reader {
 public:
-    //! Reads the MXNet Record File, and loads the image ids and other necessary info
+    //! Looks up the folder which contains the files, amd loads the image names
     /*!
      \param desc  User provided descriptor containing the files' path.
     */
@@ -50,45 +49,51 @@ public:
      \return The size of the next file, 0 if couldn't access it
     */
     size_t open() override;
-    //! Resets the object's state to read from the first file in the folder
+
+    //! Resets the object's state to read from the first file in the list
     void reset() override;
 
-    //! Returns the id of the latest file opened
+    //! Returns the name of the latest file opened
     std::string id() override { return _last_id;};
 
     unsigned count_items() override;
 
-    ~MXNetRecordIOReader() override;
+    ~ExternalSourceReader() override;
 
     int close() override;
+    // not supported for external_source
+    unsigned long long get_shuffle_time() {return 0;};
 
-    MXNetRecordIOReader();
-    
-    unsigned long long get_shuffle_time() override {return 0;}
+    ExternalSourceReader();
 
-    //! return feed_data: not implemented
-    void feed_file_names(const std::vector<std::string>& file_names, size_t num_images, bool eos=false) override {return;};
+    //! receive next set of filenames from external source
+    void feed_file_names(const std::vector<std::string>& file_names, size_t num_images, bool eos=false) override;
 
-    //! return feed_data: not implemented
-    void feed_data(const std::vector<char *>& images, const std::vector<size_t>& image_size, int mode, bool eos = false, int width=0, int height=0, int channels=0) override{return;};
+    //! receive next set of file data from external source
+    void feed_data(const std::vector<char *>& images, const std::vector<size_t>& image_size, int mode, bool eos = false, int width=0, int height=0, int channels=0) override;
+
+    // mode(): returs the mode for the reader
+    FileMode mode() {return _mode;};
+
+    // get image_dims
+    void get_dims(int& width, int& height, int& channels);
 
 
 private:
     //! opens the folder containnig the images
-    Reader::Status record_reading();
-    Reader::Status MXNet_reader();
-    std::string _path;
-    DIR *_src_dir;
-    struct dirent *_entity;
-    std::string _image_key;
-    std::vector<std::string> _file_names;
-    std::map<std::string, std::tuple<unsigned int, int64_t, int64_t> > _record_properties;
+    std::string _folder_path;
+    std::queue<std::string> _file_names_q;
+    std::vector<size_t> _file_sizes;
+    std::vector<std::tuple<char*, size_t, int, int, int>> _file_data;
+    std::queue<std::tuple<char*, size_t, int, int, int>> _images_data_q;
+    std::mutex _lock;
+    std::condition_variable _wait_for_input;
+    
     unsigned  _curr_file_idx;
+    FILE* _current_fPtr;
     unsigned _current_file_size;
-    std::string _last_id, _last_file_name;
-    unsigned int _last_file_size;
-    int64_t _last_seek_pos;
-    int64_t _last_data_size;
+    std::string _last_id;
+    std::string _last_file_name;
     size_t _shard_id = 0;
     size_t _shard_count = 1;// equivalent of batch size
     //!< _batch_count Defines the quantum count of the images to be read. It's usually equal to the user's batch size.
@@ -100,7 +105,12 @@ private:
     bool _loop;
     bool _shuffle;
     int _read_counter = 0;
+    volatile bool _end_of_sequence;
     //!< _file_count_all_shards total_number of files in to figure out the max_batch_size (usually needed for distributed training).
+    void push_file_name(const std::string& image_name);
+    bool pop_file_name(std::string& file_name);
+    void push_file_data(std::tuple<char*, size_t, int, int, int>& image);
+    bool pop_file_data(std::tuple<char*, size_t, int, int, int>& image);
     size_t  _file_count_all_shards;
     void incremenet_read_ptr();
     int release();
@@ -108,15 +118,6 @@ private:
     void incremenet_file_id() { _file_id++; }
     void replicate_last_image_to_fill_last_shard();
     void replicate_last_batch_to_pad_partial_shard();
-    void read_image(unsigned char* buff, int64_t seek_position, int64_t data_size);
-    void read_image_names();
-    uint32_t DecodeFlag(uint32_t rec) {return (rec >> 29U) & 7U; };
-    uint32_t DecodeLength(uint32_t rec) {return rec & ((1U << 29U) - 1U); };
-    std::vector<std::tuple<int64_t, int64_t>> _indices;// used to store seek position and record size for a particular record.
-    std::ifstream _file_contents;
-    const uint32_t _kMagic = 0xced7230a;
-    int64_t _seek_pos, _data_size_to_read;
-    ImageRecordIOHeader _hdr;
-    TimingDBG _shuffle_time;
+    FileMode _mode;
 };
-
+#endif

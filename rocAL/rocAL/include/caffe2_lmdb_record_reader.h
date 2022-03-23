@@ -68,6 +68,12 @@ public:
 
     Caffe2LMDBRecordReader();
     unsigned long long get_shuffle_time() override {return 0;}
+    //! return feed_data: not implemented
+    void feed_file_names(const std::vector<std::string>& file_names, size_t num_images, bool eos=false) override {return;};
+
+    //! return feed_data: not implemented
+    void feed_data(const std::vector<char *>& images, const std::vector<size_t>& image_size, int mode, bool eos = false, int width=0, int height=0, int channels=0) override{return;};
+
 private:
     //! opens the folder containnig the images
     Reader::Status Caffe2_LMDB_reader();
