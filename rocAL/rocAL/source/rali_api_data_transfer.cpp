@@ -90,5 +90,27 @@ raliCopyToOutput(
     return RALI_OK;
 }
 
+//todo:: change input to tensor
+RaliStatus RALI_API_CALL
+raliExternalSourceFeedInput(
+        RaliContext p_context,
+        RaliImage Input,
+        RaliExtSourceMode mode,
+        RaliTensorLayout layout)
+{
+    auto context = static_cast<Context*>(p_context);
+    try
+    {
+        //context->master_graph->feed_input(input, mode, layout);
+        // should call root_node process_input
+    }
+    catch(const std::exception& e)
+    {
+        context->capture_error(e.what());
+        ERR(e.what())
+        return RALI_RUNTIME_ERROR;
+    }
+    return RALI_OK;
+}
 
 
