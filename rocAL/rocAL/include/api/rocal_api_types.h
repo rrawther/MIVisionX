@@ -41,6 +41,7 @@ typedef void * RocalIntParam;
 typedef void * RocalContext;
 typedef void * RocalImage;
 typedef void * RocalMetaData;
+typedef void * RocalTensor;
 
 typedef std::vector<int> ImageIDBatch,AnnotationIDBatch;
 typedef std::vector<std::string> ImagePathBatch;

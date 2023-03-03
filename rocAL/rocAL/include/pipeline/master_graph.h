@@ -55,6 +55,7 @@ public:
     MasterGraph::Status copy_out_tensor(void *out_ptr, RocalTensorFormat format, float multiplier0, float multiplier1, float multiplier2,
                     float offset0, float offset1, float offset2, bool reverse_channels, RocalTensorDataType output_data_type);
     Status copy_output(unsigned char* out_ptr, size_t out_size_in_bytes);
+    Status copy_output(std::vector<void *> &out_ptr);   // for tensor pipeline
     Status copy_out_tensor_planar(void *out_ptr, RocalTensorFormat format, float multiplier0, float multiplier1, float multiplier2,
                     float offset0, float offset1, float offset2, bool reverse_channels, RocalTensorDataType output_data_type);
     size_t output_width();
@@ -72,10 +73,13 @@ public:
     RocalMemType mem_type();
     void release();
     template <typename T>
-    std::shared_ptr<T> add_node(const std::vector<Image *> &inputs, const std::vector<Image *> &outputs);
+    std::shared_ptr<T> add_node(const std::vector<Image *> &inputs, const std::vector<Image *> &outputs);    
+    template <typename T> std::shared_ptr<T> add_node(const std::vector<rocalTensor *> &inputs, const std::vector<rocalTensor *> &outputs);
     template <typename T, typename M> std::shared_ptr<T> meta_add_node(std::shared_ptr<M> node);
     Image *create_image(const ImageInfo &info, bool is_output);
     Image *create_loader_output_image(const ImageInfo &info);
+    rocalTensor *create_tensor(const rocalTensorInfo &info, bool is_output);
+    rocalTensor *create_loader_output_tensor(const rocalTensorInfo &info);
     MetaDataBatch *create_label_reader(const char *source_path, MetaDataReaderType reader_type);
     MetaDataBatch *create_video_label_reader(const char *source_path, MetaDataReaderType reader_type, unsigned sequence_length, unsigned frame_step, unsigned frame_stride, bool file_list_frame_num = true);
     MetaDataBatch *create_coco_meta_data_reader(const char *source_path, bool is_output, MetaDataReaderType reader_type , MetaDataType label_type, float sigma = 0.0, unsigned pose_output_width = 0, unsigned pose_output_height = 0);
@@ -108,9 +112,11 @@ public:
     void set_sequence_batch_ratio() { _sequence_batch_ratio = _sequence_batch_size / _internal_batch_size; }
     Status get_bbox_encoded_buffers(float **boxes_buf_ptr, int **labels_buf_ptr, size_t num_encoded_boxes);
     size_t bounding_box_batch_count(int* buf, pMetaDataBatch meta_data_batch);
+    void load_module(const char *module_name, bool load_global=false);
 #if ENABLE_OPENCL
     cl_command_queue get_ocl_cmd_q() { return _device.resources().cmd_queue; }
 #endif
+
 private:
     Status update_node_parameters();
     Status allocate_output_tensor();
@@ -138,6 +144,15 @@ private:
     std::list<std::shared_ptr<Node>> _root_nodes;//!< List of all root nodes (image/video loaders)
     std::list<std::shared_ptr<Node>> _meta_data_nodes;//!< List of nodes where meta data has to be updated after augmentation
     std::map<Image*, std::shared_ptr<Node>> _image_map;//!< key: image, value : Parent node
+    std::map<rocalTensor*, std::shared_ptr<Node>> _tensor_map;//!< key: image, value : Parent node
+#if ENABLE_TENSOR_PIPELINE
+    std::vector<rocalTensor*> _output_tensors;//!< Keeps the ovx tensors that are used to store the augmented output (there is an tensor per augmentation branch)
+    std::list<rocalTensor*> _internal_tensors;//!< Keeps all the ovx tensors (virtual/non-virtual) either intermediate images, or input tensors that feed the graph
+    std::vector<size_t> _tensor_data_size;   //!< size in bytes of each output tensor
+    std::list<std::shared_ptr<TensorNode>> _tnodes;//!< List of all the nodes
+    std::list<std::shared_ptr<TensorNode>> _root_tnodes;//!< List of all root nodes (image/video loaders)
+#endif    
+    
 #if ENABLE_HIP
     void * _output_tensor;//!< In the GPU processing case , is used to convert the U8 samples to float32 before they are being transfered back to host
     DeviceManagerHip   _device;//!< Keeps the device related constructs needed for running on GPU
@@ -240,6 +255,7 @@ template<> inline std::shared_ptr<ImageLoaderNode> MasterGraph::add_node(const s
 
     return node;
 }
+
 template<> inline std::shared_ptr<ImageLoaderSingleShardNode> MasterGraph::add_node(const std::vector<Image*>& inputs, const std::vector<Image*>& outputs)
 {
     if(_loader_module)
@@ -253,6 +269,7 @@ template<> inline std::shared_ptr<ImageLoaderSingleShardNode> MasterGraph::add_n
 
     return node;
 }
+
 template<> inline std::shared_ptr<FusedJpegCropNode> MasterGraph::add_node(const std::vector<Image*>& inputs, const std::vector<Image*>& outputs)
 {
     if(_loader_module)
@@ -330,4 +347,42 @@ template<> inline std::shared_ptr<VideoLoaderSingleShardNode> MasterGraph::add_n
 
     return node;
 }
+#endif
+
+#if ENABLE_TENSOR_PIPELINE
+template <typename T>
+std::shared_ptr<T> MasterGraph::add_node(const std::vector<rocalTensor *> &inputs, const std::vector<rocalTensor *> &outputs)
+{
+    auto node = std::make_shared<T>(inputs, outputs);
+    _tnodes.push_back(node);
+
+    for(auto& input: inputs)
+    {
+        if (_tensor_map.find(input) == _tensor_map.end())
+            THROW("Input image is invalid, cannot be found among output of previously created nodes")
+
+        auto parent_node = _tensor_map.find(input)->second;
+        parent_node->add_next(node);
+        node->add_previous(parent_node);
+    }
+
+    for(auto& output: outputs)
+        _tensor_map.insert(make_pair(output, node));
+
+    return node;
+}
+template<> inline std::shared_ptr<ImageLoaderSingleShardNode> MasterGraph::add_node(const std::vector<rocalTensor*>& inputs, const std::vector<rocalTensor*>& outputs)
+{
+    if(_loader_module)
+        THROW("A loader already exists, cannot have more than one loader")
+    auto node = std::make_shared<ImageLoaderSingleShardNode>(outputs[0], _device.resources());
+    _loader_module = node->get_loader_module();
+    _loader_module->set_prefetch_queue_depth(_prefetch_queue_depth);
+    _root_nodes.push_back(node);
+    for(auto& output: outputs)
+        _image_map.insert(make_pair(output, node));
+
+    return node;
+}
+
 #endif

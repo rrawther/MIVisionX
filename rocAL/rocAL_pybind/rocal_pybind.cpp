@@ -857,5 +857,10 @@ namespace rocal{
             py::arg("input"),
             py::arg("is_output"),
             py::arg("adj_value_param") = NULL);
+        m.def("LoadLibrary", &rocalLoadModule,
+            py::arg("lib_path"),
+            py::arg("global_symbols") = false);
+        m.def("rocalCopyToOutput",&wrapper_copy_to_output);
+        m.def("CustomOp", &rocalCustom);
     }
 }

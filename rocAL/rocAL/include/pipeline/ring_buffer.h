@@ -45,12 +45,21 @@ public:
     ///\param dev
     ///\param sub_buffer_size
     ///\param sub_buffer_count
-#if ENABLE_HIP
-    void initHip(RocalMemType mem_type, DeviceResourcesHip dev, unsigned sub_buffer_size, unsigned sub_buffer_count);
-#else
+#if ENABLE_TENSOR_PIPELINE
+  #if ENABLE_HIP
+    void init(RocalMemType mem_type, DeviceResourcesHip dev, std::vector<size_t> &sub_buffer_size, unsigned sub_buffer_count);
+  #else
+    void init(RocalMemType mem_type, DeviceResources dev, std::vector<size_t> &sub_buffer_size, unsigned sub_buffer_count);
+  #endif
+#else    
+  #if ENABLE_HIP
+    void init(RocalMemType mem_type, DeviceResourcesHip dev, unsigned sub_buffer_size, unsigned sub_buffer_count);
+  #else
     void init(RocalMemType mem_type, DeviceResources dev, unsigned sub_buffer_size, unsigned sub_buffer_count);
+  #endif
 #endif
     void initBoxEncoderMetaData(RocalMemType mem_type, size_t encoded_bbox_size, size_t encoded_labels_size);
+    void init_metadata(RocalMemType mem_type, std::vector<size_t> sub_buffer_size, unsigned sub_buffer_count);
     void release_gpu_res();
     std::vector<void*> get_read_buffers() ;
     void* get_host_master_read_buffer();
@@ -58,7 +67,10 @@ public:
     std::pair<void*, void*> get_box_encode_write_buffers();
     std::pair<void*, void*> get_box_encode_read_buffers();
     MetaDataNamePair& get_meta_data();
-    void set_meta_data(ImageNameBatch names, pMetaDataBatch meta_data);
+    void set_meta_data(ImageNameBatch names, pMetaDataBatch meta_data, bool is_segmentation = false);
+    //MetaDataDimensionsBatch& get_meta_data_info();
+    std::vector<void*> get_meta_read_buffers();
+    void rellocate_meta_data_buffer(void * buffer, size_t buffer_size, unsigned buff_idx);
     void reset();
     void pop();
     void push();
@@ -76,14 +88,21 @@ private:
     void increment_write_ptr();
     bool full();
     const unsigned BUFF_DEPTH;
+#if ENABLE_TENSOR_PIPELINE
+    std::vector<size_t> _sub_buffer_size;
+#else    
     unsigned _sub_buffer_size;
+#endif    
     unsigned _sub_buffer_count;
+    std::vector<size_t> _meta_data_sub_buffer_size;
+    unsigned _meta_data_sub_buffer_count;
     std::mutex _lock;
     std::condition_variable _wait_for_load;
     std::condition_variable _wait_for_unload;
     std::vector<std::vector<void*>> _dev_sub_buffer;
     std::vector<void*> _host_master_buffers;
     std::vector<std::vector<void*>> _host_sub_buffers;
+    std::vector<std::vector<void*>> _host_meta_data_buffers;
     std::vector<void *> _dev_bbox_buffer;
     std::vector<void *> _dev_labels_buffer;
     bool _dont_block = false;

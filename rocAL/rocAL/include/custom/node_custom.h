@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,26 +21,25 @@ THE SOFTWARE.
 */
 
 #pragma once
-#include "commons.h"
-#include <VX/vx.h>
-#include <VX/vx_types.h>
+#include "node.h"
 
-
-class Graph
+class CustomNode : public NodeTensor
 {
 public:
-    enum class Status { OK = 0 };
-    Graph(vx_context context, RocalAffinity affinity, int cpu_id = 0, int gpu_id = 0 );
-    Status verify();
-    Status process();
-    Status release();
-    vx_graph get() { return _graph; }
-    vx_context context() { return _context; }
+    explicit CustomNode(const std::vector<rocalTensor *> &inputs, const std::vector<rocalTensor *> &outputs);
+    ~CustomNode();
+
+    void init(const char *fun_name, RocalAffinity affinity, const void *custom_params, size_t custom_params_size);
+
+protected:
+    void update_node() override;
+    void create_node() override;
 private:
-    RocalMemType _mem_type;
-    vx_context  _context = nullptr;
-    vx_graph    _graph = nullptr;
-    RocalAffinity _affinity;
-    int _gpu_id;
-    int _cpu_id;
+    // todo:: to be removed when we switch to full tensor pipeline
+    vx_tensor _input_tensor;   
+    vx_uint32 _custom_func = 0;
+    vx_uint32 _backend = 0;
+    vx_array _custom_params_array;
+
+    std::map<std::string, int> _func_map = {{"Copy", 0}};   // default value
 };

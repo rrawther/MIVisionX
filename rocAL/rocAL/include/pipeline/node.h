@@ -25,7 +25,9 @@ THE SOFTWARE.
 #include <memory>
 #include "graph.h"
 #include "image.h"
+#include "tensor.h"
 #include "meta_data_graph.h"
+
 class Node
 {
 public:
@@ -56,3 +58,39 @@ protected:
     size_t _batch_size;
     MetaDataBatch* _meta_data_info;
 };
+
+#if ENABLE_TENSOR_PIPELINE
+
+//todo:: Node will be removed when we completely switch to tensor
+class NodeTensor
+{
+public:
+    NodeTensor(const std::vector<rocalTensor *> &inputs, const std::vector<rocalTensor *> &outputs) :
+        _inputs(inputs),
+        _outputs(outputs),
+        _batch_size(outputs[0]->info().batch_size()) {}
+    virtual ~NodeTensor();
+    void create(std::shared_ptr<Graph> graph);
+    void update_parameters();
+    std::vector<rocalTensor*> input() { return _inputs; };
+    std::vector<rocalTensor*> output() { return _outputs; };
+    void add_next(const std::shared_ptr<Node>& node) {} // To be implemented
+    void add_previous(const std::shared_ptr<Node>& node) {} //To be implemented
+    std::shared_ptr<Graph> graph() { return _graph; }
+    void set_meta_data(MetaDataBatch* meta_data_info){_meta_data_info = meta_data_info;}
+    bool _is_ssd = false;
+protected:
+    virtual void create_node() = 0;
+    virtual void update_node() = 0;
+    virtual void update_src_roi();
+    std::vector<rocalTensor*> _inputs;
+    std::vector<rocalTensor*> _outputs;
+    std::shared_ptr<Graph> _graph = nullptr;
+    vx_array _src_roi_width = nullptr;
+    vx_array _src_roi_height = nullptr;
+    vx_node _node = nullptr;
+    size_t _batch_size;
+    MetaDataBatch* _meta_data_info;
+};
+
+#endif

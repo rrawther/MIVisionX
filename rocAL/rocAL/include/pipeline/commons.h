@@ -33,16 +33,36 @@ THE SOFTWARE.
 #include "log.h"
 
 
-enum class RocalTensorFormat
+/*! \brief Tensor layouts
+ *
+ * currently supported by Rocal SDK as input/output
+ */
+enum class RocalTensorlayout
 {
     NHWC = 0,
-    NCHW
+    NCHW,
+    NFHWC,
+    NFCHW,
+    NONE
 };
+
+// for backward compatability:: tobe removed
+typedef RocalTensorlayout RocalTensorFormat; 
+
+/*! \brief Tensor data type
+ *
+ * currently supported by Rocal SDK as input/output
+ */
 enum class RocalTensorDataType
 {
     FP32 = 0,
-    FP16
+    FP16,
+    UINT8,
+    INT8,
+    UINT32,
+    INT32
 };
+
 enum class RocalAffinity
 {
     GPU = 0,
@@ -81,6 +101,21 @@ enum class DecodeMode
     CPU = 1
 };
 
+/*! \brief Tensor ROI type
+ *
+ * currently supports following formats
+ */
+enum class RocalROIType
+{
+    XYWH = 0,
+    LTRB
+};
+
+typedef struct
+{
+    unsigned x1, y1, x2, y2;
+} RocalROI;
+
 struct Timing
 {
     // The following timings are accumulated timing not just the most recent activity
@@ -100,3 +135,5 @@ struct Timing
     long long unsigned video_decode_time= 0;
     long long unsigned video_process_time= 0;
 };
+
+#define ENABLE_TENSOR_PIPELINE  1   // for testing tensor pipeline

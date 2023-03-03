@@ -116,7 +116,3 @@ rocalVerify(RocalContext p_context)
     }
     return ROCAL_OK;
 }
-
-
-
-

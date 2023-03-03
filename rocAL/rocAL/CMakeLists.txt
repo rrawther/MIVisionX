@@ -140,6 +140,7 @@ if(${BUILD_ROCAL})
                 ../../amd_openvx/openvx/include/
                 ../../amd_openvx_extensions/amd_rpp/include/
                 ../../amd_openvx_extensions/amd_media/include/
+                ../../amd_openvx_extensions/amd_custom/include/
                 ../third_party/rapidjson/include/
                 ./include/api/
                 ./include/augmentations/color_augmentations/
@@ -157,6 +158,7 @@ if(${BUILD_ROCAL})
                 ./include/readers/image/
                 ./include/readers/video/
                 ./include/pipeline/
+                ./include/custom/
                 include
                 )
 

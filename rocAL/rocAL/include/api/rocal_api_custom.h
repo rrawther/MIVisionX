@@ -1,3 +1,4 @@
+
 /*
 MIT License
 Copyright (c) 2019 - 2022 Advanced Micro Devices, Inc. All rights reserved.
@@ -21,40 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#ifndef ROCAL_H
-#define ROCAL_H
+#ifndef ROCAL_API_CUSTOM_H
+#define ROCAL_API_CUSTOM_H
 
 #include "rocal_api_types.h"
-#include "rocal_api_parameters.h"
-#include "rocal_api_data_loaders.h"
-#include "rocal_api_augmentation.h"
-#include "rocal_api_data_transfer.h"
-#include "rocal_api_meta_data.h"
-#include "rocal_api_info.h"
-
-/// Creates the context for a new augmentation pipeline. Initializes all the required internals for the pipeline
-/// \param batch_size
-/// \param affinity
-/// \param gpu_id
-/// \param cpu_thread_count
-/// \return
-extern "C"  RocalContext  ROCAL_API_CALL rocalCreate(size_t batch_size, RocalProcessMode affinity, int gpu_id = 0, size_t cpu_thread_count = 1, size_t prefetch_queue_depth = 3, RocalTensorOutputType output_tensor_data_type = RocalTensorOutputType::ROCAL_FP32);
-//extern "C"  RocalContext  ROCAL_API_CALL rocalCreate(size_t batch_size, RocalProcessMode affinity, int gpu_id = 0, size_t cpu_thread_count = 1);
-
-///
-/// \param context
-/// \return
-extern "C"  RocalStatus ROCAL_API_CALL rocalVerify(RocalContext context);
-
-///
-/// \param context
-/// \return
-extern "C"  RocalStatus  ROCAL_API_CALL rocalRun(RocalContext context);
-
-///
-/// \param rocal_context
-/// \return
-extern "C"  RocalStatus  ROCAL_API_CALL rocalRelease(RocalContext rocal_context);
 
 /**
  * @brief Load plugin OpenVX extension library module
@@ -64,5 +35,28 @@ extern "C"  RocalStatus  ROCAL_API_CALL rocalRelease(RocalContext rocal_context)
   * @returns RocalStatus
   */
 extern "C"  RocalStatus  ROCAL_API_CALL rocalLoadModule(RocalContext rocal_context, const char *module_name, bool global_symbols = false);
+
+/// 
+/// \param context
+/// \param input
+/// \param is_output
+/// \param fun_name custom function name implemented in module (match the exact definition:: case sensitive)
+/// \param custom_param custom_param buffer.
+/// \param custom_param_size The size in bytes of custom_param.
+/// \param rocal_tensor_output_layout The layout of input/output tensor.
+/// \param rocal_tensor_output_datatype The data_type of input/output tensor.
+/// \return
+
+extern "C" RocalImage  ROCAL_API_CALL
+rocalCustom(
+        RocalContext p_context,
+        RocalTensor p_input,
+        bool is_output,
+        const char *fun_name,
+        RocalTensor custom_param,
+        size_t custom_param_size,
+        RocalTensorLayout rocal_tensor_output_layout = RocalTensorLayout::ROCAL_NHWC,
+        RocalTensorDataType rocal_tensor_output_datatype = RocalTensorOutputType::U8);
+
 
 #endif

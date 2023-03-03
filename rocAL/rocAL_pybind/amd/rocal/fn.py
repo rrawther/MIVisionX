@@ -573,3 +573,9 @@ def snp_noise(*inputs, snpNoise=None, device=None, preserve = False):
     kwargs_pybind = {"input_image0":inputs[0], "is_output":False ,"snpNoise": snpNoise}
     snp_noise_added_image = b.SnPNoise(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
     return (snp_noise_added_image)
+
+def custom(*inputs, device=None):
+    # pybind call arguments
+    kwargs_pybind = {"input_image0": inputs[0],"is_output": False }
+    output = b.rocalCustom(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
+    return (output)

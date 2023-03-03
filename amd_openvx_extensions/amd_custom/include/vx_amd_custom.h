@@ -52,6 +52,6 @@ typedef struct _vx_amd_custom_params_t
  * \returns A node reference <tt>\ref vx_node</tt>. Any possible errors preventing a
  * successful creation should be checked using <tt>\ref vxGetStatus</tt>.
  */
-VX_API_ENTRY vx_node VX_API_CALL vxCustomLayer(vx_graph graph, vx_tensor inputs, vx_enum function, vx_array custom_parameters, vx_tensor outputs);
+VX_API_ENTRY vx_node VX_API_CALL vxCustomLayer(vx_graph graph, vx_tensor inputs, vx_enum function, vx_uint32 custom_backend, vx_array custom_parameters, vx_tensor outputs);
 
 #endif
