@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,53 +22,15 @@ THE SOFTWARE.
 
 
 
-#include "node_warp_affine.h"
-#include "node_exposure.h"
-#include "node_vignette.h"
-#include "node_jitter.h"
-#include "node_snp_noise.h"
-#include "node_snow.h"
-#include "node_rain.h"
-#include "node_color_temperature.h"
-#include "node_fog.h"
-#include "node_pixelate.h"
-#include "node_lens_correction.h"
-#include "node_gamma.h"
-#include "node_flip.h"
-#include "node_crop_resize.h"
-#include "node_brightness.h"
-#include "node_contrast.h"
-#include "node_blur.h"
-#include "node_fisheye.h"
-#include "node_blend.h"
-#include "node_resize.h"
-#include "node_rotate.h"
-#include "node_color_twist.h"
-#include "node_hue.h"
-#include "node_saturation.h"
-#include "node_crop_mirror_normalize.h"
-#include "node_resize_crop_mirror.h"
-#include "node_ssd_random_crop.h"
-#include "node_crop.h"
-#include "node_random_crop.h"
-#include "node_copy.h"
-#include "node_nop.h"
-#include "meta_node_crop_mirror_normalize.h"
-#include "meta_node_resize.h"
-#include "meta_node_crop_resize.h"
-#include "meta_node_crop.h"
-#include "meta_node_resize_crop_mirror.h"
-#include "meta_node_rotate.h"
-#include "meta_node_ssd_random_crop.h"
-#include "meta_node_flip.h"
-#include "node_sequence_rearrange.h"
-
+#include "augmentations_nodes.h"
+#include "augmentations_meta_nodes.h"
 #include "commons.h"
 #include "context.h"
 #include "rocal_api.h"
 #include "image_source_evaluator.h"
 
-#define MAX_ASPECT_RATIO 3.0f
+// Calculated from the largest resize shorter dimension in imagenet validation dataset
+#define MAX_ASPECT_RATIO 6.0f
 
 RocalImage  ROCAL_API_CALL
 rocalSequenceRearrange(
@@ -514,6 +476,7 @@ rocalResize(
         unsigned resize_shorter,
         unsigned resize_longer,
         RocalResizeInterpolationType interpolation_type) {
+
     Image* output = nullptr;
     if ((p_context == nullptr) || (p_input == nullptr)) {
         ERR("Invalid ROCAL context or invalid input image")
@@ -596,6 +559,55 @@ rocalResize(
         resize_node->init(out_width, out_height, resize_scaling_mode, maximum_size, interpolation_type);
         if (context->master_graph->meta_data_graph())
             context->master_graph->meta_add_node<ResizeMetaNode,ResizeNode>(resize_node);
+    }
+    catch(const std::exception& e)
+    {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalImage  ROCAL_API_CALL
+rocalResizeMirrorNormalize(
+            RocalContext p_context,
+            RocalImage p_input,
+            unsigned dest_width,
+            unsigned dest_height,
+            std::vector<float> &mean,
+            std::vector<float> &std_dev,
+            bool is_output,
+            RocalIntParam p_mirror)
+{
+    if(!p_context || !p_input || dest_width == 0 || dest_height == 0 )
+        THROW("Null values passed as input")
+    Image* output = nullptr;
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Image*>(p_input);
+    auto mirror = static_cast<IntParam *>(p_mirror);
+    for(unsigned i = 0; i < mean.size(); i++) {
+        mean[i] = 0;
+        std_dev[i] = 1;
+    }
+
+   try
+    {
+        // For the resize mirror normalize resize node, user can create an image with a different width and height
+        ImageInfo output_info = input->info();
+        output_info.width(dest_width);
+        output_info.height(dest_height);
+        output = context->master_graph->create_image(output_info, is_output);
+        // For the nodes that user provides the output size the dimension of all the images after this node will be fixed and equal to that size
+        output->reset_image_roi();
+
+        std::shared_ptr<ResizeMirrorNormalizeNode> rmn_node =  context->master_graph->add_node<ResizeMirrorNormalizeNode>({input}, {output});
+        // RPP doesn't support returning float buffers so passing 0 and 1 as mean and std and doing normalization in rocAL
+        // TODO: To be removed with rocAL Tensor support
+        // rmn_node->init(0, 1, mirror);
+        rmn_node->init(mean, std_dev, mirror);
+        // TODO: Uncomment the below lines once RMN meta node is added to ToT
+        // if (context->master_graph->meta_data_graph())
+        //     context->master_graph->meta_add_node<ResizeMirrorNormalizeMetaNode,ResizeMirrorNormalizeNode>(rmn_node);
     }
     catch(const std::exception& e)
     {
@@ -1786,7 +1798,7 @@ rocalCropFixed(
         ImageInfo output_info = input->info();
         output_info.width(crop_width);
         output_info.height(crop_height);
-        output = context->master_graph->create_image(input->info(), is_output);
+        output = context->master_graph->create_image(output_info, is_output);
         output->reset_image_roi();
         std::shared_ptr<CropNode> crop_node =  context->master_graph->add_node<CropNode>({input}, {output});
         crop_node->init(crop_height, crop_width, crop_pos_x, crop_pos_y);
@@ -1825,7 +1837,7 @@ rocalCropCenterFixed(
         ImageInfo output_info = input->info();
         output_info.width(crop_width);
         output_info.height(crop_height);
-        output = context->master_graph->create_image(input->info(), is_output);
+        output = context->master_graph->create_image(output_info, is_output);
         output->reset_image_roi();
         std::shared_ptr<CropNode> crop_node =  context->master_graph->add_node<CropNode>({input}, {output});
         crop_node->init(crop_height, crop_width);

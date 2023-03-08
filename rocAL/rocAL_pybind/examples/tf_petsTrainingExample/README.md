@@ -1,7 +1,17 @@
 ## Running tf_petsTrainingExample
 
 ### Building the required TF Rocm docker
+<<<<<<< HEAD
 Use the instructions in the [docker section](../../../../../docker) to build the required [Tensorflow docker](../../../../../docker/tensorflow)
+=======
+* Use the instructions in the [docker section](../../../../docker) to build the required [Tensorflow docker](../../../../docker/tensorflow)
+* Upgrade pip to the latest version.
+
+### Building the required Pytorch Rocm docker
+* Use the instructions in the [docker section](../../../../docker) to build the required [Pytorch docker](../../../../docker/pytorch)
+* Upgrade pip to the latest version.
+* Run requirements.sh to install the required packages.
+>>>>>>> upstream/develop
 
 ### Running the training
 
@@ -10,5 +20,9 @@ Use the instructions in the [docker section](../../../../../docker) to build the
 
 To run this example for the first run or subsequent runs, just execute:
 ```
+<<<<<<< HEAD
 python3.9 train_withROCAL_withTFRecordReader.py
+=======
+python3 train_withROCAL_withTFRecordReader.py
+>>>>>>> upstream/develop
 ```

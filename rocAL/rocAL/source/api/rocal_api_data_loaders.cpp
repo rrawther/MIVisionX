@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,6 @@ THE SOFTWARE.
 #include "node_image_loader_single_shard.h"
 #include "node_cifar10_loader.h"
 #include "image_source_evaluator.h"
-#include "node_fisheye.h"
 #include "node_copy.h"
 #include "node_fused_jpeg_crop.h"
 #include "node_fused_jpeg_crop_single_shard.h"
@@ -42,6 +41,7 @@ THE SOFTWARE.
 #include "meta_node_resize.h"
 
 namespace filesys = boost::filesystem;
+#define MAX_ASPECT_RATIO 3.0f
 
 std::tuple<unsigned, unsigned>
 evaluate_image_data_set(RocalImageSizeEvaluationPolicy decode_size_policy, StorageType storage_type,
@@ -772,21 +772,16 @@ rocalJpegCaffeLMDBRecordSourcePartialSingleShard(
         unsigned shard_id,
         unsigned shard_count,
         bool is_output,
+        std::vector<float>& area_factor,
+        std::vector<float>& aspect_ratio,
+        unsigned num_attempts,
         bool shuffle,
         bool loop,
         RocalImageSizeEvaluationPolicy decode_size_policy,
         unsigned max_width,
-        unsigned max_height,
-        RocalFloatParam p_area_factor,
-        RocalFloatParam p_aspect_ratio,
-        RocalFloatParam p_x_drift_factor,
-        RocalFloatParam p_y_drift_factor )
+        unsigned max_height)
 {
     Image* output = nullptr;
-    auto area_factor  = static_cast<FloatParam*>(p_area_factor);
-    auto aspect_ratio = static_cast<FloatParam*>(p_aspect_ratio);
-    auto x_drift_factor = static_cast<FloatParam*>(p_x_drift_factor);
-    auto y_drift_factor = static_cast<FloatParam*>(p_y_drift_factor);
     auto context = static_cast<Context*>(p_context);
     try
     {
@@ -831,7 +826,7 @@ rocalJpegCaffeLMDBRecordSourcePartialSingleShard(
                                                                             context->user_batch_size(),
                                                                             context->master_graph->mem_type(),
                                                                             context->master_graph->meta_data_reader(),
-                                                                            area_factor, aspect_ratio, x_drift_factor, y_drift_factor);
+                                                                            num_attempts, area_factor, aspect_ratio);
 
 
         context->master_graph->set_loop(loop);
@@ -859,21 +854,16 @@ rocalJpegCaffe2LMDBRecordSourcePartialSingleShard(
         unsigned shard_id,
         unsigned shard_count,
         bool is_output,
+        std::vector<float>& area_factor,
+        std::vector<float>& aspect_ratio,
+        unsigned num_attempts,
         bool shuffle,
         bool loop,
         RocalImageSizeEvaluationPolicy decode_size_policy,
         unsigned max_width,
-        unsigned max_height,
-        RocalFloatParam p_area_factor,
-        RocalFloatParam p_aspect_ratio,
-        RocalFloatParam p_x_drift_factor,
-        RocalFloatParam p_y_drift_factor )
+        unsigned max_height)
 {
     Image* output = nullptr;
-    auto area_factor  = static_cast<FloatParam*>(p_area_factor);
-    auto aspect_ratio = static_cast<FloatParam*>(p_aspect_ratio);
-    auto x_drift_factor = static_cast<FloatParam*>(p_x_drift_factor);
-    auto y_drift_factor = static_cast<FloatParam*>(p_y_drift_factor);
     auto context = static_cast<Context*>(p_context);
     try
     {
@@ -918,7 +908,7 @@ rocalJpegCaffe2LMDBRecordSourcePartialSingleShard(
                                                                             context->user_batch_size(),
                                                                             context->master_graph->mem_type(),
                                                                             context->master_graph->meta_data_reader(),
-                                                                            area_factor, aspect_ratio, x_drift_factor, y_drift_factor);
+                                                                            num_attempts, area_factor, aspect_ratio);
         context->master_graph->set_loop(loop);
 
         if(is_output)
@@ -944,21 +934,16 @@ rocalMXNetRecordSource(
         unsigned shard_id,
         unsigned shard_count,
         bool is_output,
+        std::vector<float>& area_factor,
+        std::vector<float>& aspect_ratio,
+        unsigned num_attempts,
         bool shuffle,
         bool loop,
         RocalImageSizeEvaluationPolicy decode_size_policy,
         unsigned max_width,
-        unsigned max_height,
-        RocalFloatParam p_area_factor,
-        RocalFloatParam p_aspect_ratio,
-        RocalFloatParam p_x_drift_factor,
-        RocalFloatParam p_y_drift_factor )
+        unsigned max_height)
 {
     Image* output = nullptr;
-    auto area_factor  = static_cast<FloatParam*>(p_area_factor);
-    auto aspect_ratio = static_cast<FloatParam*>(p_aspect_ratio);
-    auto x_drift_factor = static_cast<FloatParam*>(p_x_drift_factor);
-    auto y_drift_factor = static_cast<FloatParam*>(p_y_drift_factor);
     auto context = static_cast<Context*>(p_context);
     try
     {
@@ -1003,7 +988,7 @@ rocalMXNetRecordSource(
                                                                             context->user_batch_size(),
                                                                             context->master_graph->mem_type(),
                                                                             context->master_graph->meta_data_reader(),
-                                                                            area_factor, aspect_ratio, x_drift_factor, y_drift_factor);
+                                                                            num_attempts, area_factor, aspect_ratio);
 
 
         context->master_graph->set_loop(loop);
@@ -1360,22 +1345,17 @@ rocalFusedJpegCrop(
         RocalImageColor rocal_color_format,
         unsigned internal_shard_count,
         bool is_output,
+        std::vector<float>& area_factor,
+        std::vector<float>& aspect_ratio,
+        unsigned num_attempts,
         bool shuffle,
         bool loop,
         RocalImageSizeEvaluationPolicy decode_size_policy,
         unsigned max_width,
-        unsigned max_height,
-        RocalFloatParam p_area_factor,
-        RocalFloatParam p_aspect_ratio,
-        RocalFloatParam p_x_drift_factor,
-        RocalFloatParam p_y_drift_factor
+        unsigned max_height
         )
 {
     Image* output = nullptr;
-    auto area_factor  = static_cast<FloatParam*>(p_area_factor);
-    auto aspect_ratio = static_cast<FloatParam*>(p_aspect_ratio);
-    auto x_drift_factor = static_cast<FloatParam*>(p_x_drift_factor);
-    auto y_drift_factor = static_cast<FloatParam*>(p_y_drift_factor);
     auto context = static_cast<Context*>(p_context);
     try
     {
@@ -1413,7 +1393,7 @@ rocalFusedJpegCrop(
                                                                           context->user_batch_size(),
                                                                           context->master_graph->mem_type(),
                                                                           context->master_graph->meta_data_reader(),
-                                                                          area_factor, aspect_ratio, x_drift_factor, y_drift_factor);
+                                                                          num_attempts, area_factor, aspect_ratio);
         context->master_graph->set_loop(loop);
 
         if(is_output)
@@ -1439,21 +1419,16 @@ rocalJpegCOCOFileSourcePartial(
         RocalImageColor rocal_color_format,
         unsigned internal_shard_count,
         bool is_output,
+        std::vector<float>& area_factor,
+        std::vector<float>& aspect_ratio,
+        unsigned num_attempts,
         bool shuffle,
         bool loop,
         RocalImageSizeEvaluationPolicy decode_size_policy,
         unsigned max_width,
-        unsigned max_height,
-        RocalFloatParam p_area_factor,
-        RocalFloatParam p_aspect_ratio,
-        RocalFloatParam p_x_drift_factor,
-        RocalFloatParam p_y_drift_factor )
+        unsigned max_height)
 {
     Image* output = nullptr;
-    auto area_factor  = static_cast<FloatParam*>(p_area_factor);
-    auto aspect_ratio = static_cast<FloatParam*>(p_aspect_ratio);
-    auto x_drift_factor = static_cast<FloatParam*>(p_x_drift_factor);
-    auto y_drift_factor = static_cast<FloatParam*>(p_y_drift_factor);
     auto context = static_cast<Context*>(p_context);
     try
     {
@@ -1495,7 +1470,7 @@ rocalJpegCOCOFileSourcePartial(
                                                                             context->user_batch_size(),
                                                                             context->master_graph->mem_type(),
                                                                             context->master_graph->meta_data_reader(),
-                                                                            area_factor, aspect_ratio, x_drift_factor, y_drift_factor);
+                                                                            num_attempts, area_factor, aspect_ratio);
 
         context->master_graph->set_loop(loop);
 
@@ -1524,21 +1499,16 @@ rocalJpegCOCOFileSourcePartialSingleShard(
         unsigned shard_id,
         unsigned shard_count,
         bool is_output,
+        std::vector<float>& area_factor,
+        std::vector<float>& aspect_ratio,
+        unsigned num_attempts,
         bool shuffle,
         bool loop,
         RocalImageSizeEvaluationPolicy decode_size_policy,
         unsigned max_width,
-        unsigned max_height,
-        RocalFloatParam p_area_factor,
-        RocalFloatParam p_aspect_ratio,
-        RocalFloatParam p_x_drift_factor,
-        RocalFloatParam p_y_drift_factor )
+        unsigned max_height)
 {
     Image* output = nullptr;
-    auto area_factor  = static_cast<FloatParam*>(p_area_factor);
-    auto aspect_ratio = static_cast<FloatParam*>(p_aspect_ratio);
-    auto x_drift_factor = static_cast<FloatParam*>(p_x_drift_factor);
-    auto y_drift_factor = static_cast<FloatParam*>(p_y_drift_factor);
     auto context = static_cast<Context*>(p_context);
     try
     {
@@ -1581,7 +1551,7 @@ rocalJpegCOCOFileSourcePartialSingleShard(
                                                                             context->user_batch_size(),
                                                                             context->master_graph->mem_type(),
                                                                             context->master_graph->meta_data_reader(),
-                                                                            area_factor, aspect_ratio, x_drift_factor, y_drift_factor);
+                                                                            num_attempts, area_factor, aspect_ratio);
 
         context->master_graph->set_loop(loop);
 
@@ -1914,22 +1884,16 @@ rocalFusedJpegCropSingleShard(
         unsigned shard_id,
         unsigned shard_count,
         bool is_output,
+        std::vector<float>& area_factor,
+        std::vector<float>& aspect_ratio,
+        unsigned num_attempts,
         bool shuffle,
         bool loop,
         RocalImageSizeEvaluationPolicy decode_size_policy,
         unsigned max_width,
-        unsigned max_height,
-        RocalFloatParam p_area_factor,
-        RocalFloatParam p_aspect_ratio,
-        RocalFloatParam p_x_drift_factor,
-        RocalFloatParam p_y_drift_factor
-        )
+        unsigned max_height)
 {
     Image* output = nullptr;
-    auto area_factor  = static_cast<FloatParam*>(p_area_factor);
-    auto aspect_ratio = static_cast<FloatParam*>(p_aspect_ratio);
-    auto x_drift_factor = static_cast<FloatParam*>(p_x_drift_factor);
-    auto y_drift_factor = static_cast<FloatParam*>(p_y_drift_factor);
     auto context = static_cast<Context*>(p_context);
     try
     {
@@ -1970,7 +1934,7 @@ rocalFusedJpegCropSingleShard(
                                                                           context->user_batch_size(),
                                                                           context->master_graph->mem_type(),
                                                                           context->master_graph->meta_data_reader(),
-                                                                          area_factor, aspect_ratio, x_drift_factor, y_drift_factor);
+                                                                          num_attempts, area_factor, aspect_ratio);
         context->master_graph->set_loop(loop);
 
         if(is_output)
@@ -2176,7 +2140,12 @@ rocalVideoFileResize(
         bool loop,
         unsigned step,
         unsigned stride,
-        bool file_list_frame_num)
+        bool file_list_frame_num,
+        RocalResizeScalingMode scaling_mode,
+        std::vector<unsigned> max_size,
+        unsigned resize_shorter,
+        unsigned resize_longer,
+        RocalResizeInterpolationType interpolation_type)
 {
     Image* resize_output = nullptr;
     if (p_context == nullptr) {
@@ -2192,9 +2161,6 @@ rocalVideoFileResize(
             THROW("Sequence length passed should be bigger than 0")
         // Set video loader flag in master_graph
         context->master_graph->set_video_loader_flag();
-
-        if(dest_width == 0 || dest_height == 0)
-            THROW("Invalid dest_width/dest_height values passed as input")
 
         // Set default step and stride values if 0 is passed
         step = (step == 0)? sequence_length : step;
@@ -2233,10 +2199,69 @@ rocalVideoFileResize(
 
         if(dest_width != video_prop.width && dest_height != video_prop.height)
         {
+            if((dest_width | dest_height | resize_longer | resize_shorter) == 0)
+                THROW("Atleast one size 'dest_width' or 'dest_height' or 'resize_shorter' or 'resize_longer' must be specified")
+            if((dest_width | dest_height) && (resize_longer | resize_shorter))
+                THROW("Only one method of specifying size can be used \ndest_width and/or dest_height\nresize_shorter\nresize_longer")
+            if(resize_longer && resize_shorter)
+                THROW("'resize_longer' and 'resize_shorter' cannot be passed together. They are mutually exclusive.")
+
+            unsigned out_width, out_height;
+            RocalResizeScalingMode resize_scaling_mode;
+
+            // Change the scaling mode if resize_shorter or resize_longer is specified
+            if(resize_shorter) {
+                resize_scaling_mode = RocalResizeScalingMode::ROCAL_SCALING_MODE_NOT_SMALLER;
+                out_width = out_height = resize_shorter;
+            } else if(resize_longer) {
+                resize_scaling_mode = RocalResizeScalingMode::ROCAL_SCALING_MODE_NOT_LARGER;
+                out_width = out_height = resize_longer;
+            } else {
+                resize_scaling_mode = scaling_mode;
+                out_width = dest_width;
+                out_height = dest_height;
+            }
+
+            std::vector<unsigned> maximum_size;
+            if (max_size.size()) {
+                if(max_size.size() == 1) {
+                    maximum_size = {max_size[0], max_size[0]};
+                } else if(max_size.size() == 2) {
+                    maximum_size = {max_size[0], max_size[1]}; // {width, height}
+                } else {
+                    THROW("The length of max_size vector exceeds the image dimension.")
+                }
+            }
+
+            // Determine the max width and height to be set to the output info
+            unsigned max_out_width, max_out_height;
+            if (maximum_size.size() && maximum_size[0] != 0 && maximum_size[1] != 0) {
+                // If max_size is passed by the user, the resized images cannot exceed the max size,
+                max_out_width = maximum_size[0];
+                max_out_height = maximum_size[1];
+            } else {
+                // compute the output info width and height wrt the scaling modes and roi passed
+                if(resize_scaling_mode == ROCAL_SCALING_MODE_STRETCH) {
+                    max_out_width = out_width ? out_width : info.width();
+                    max_out_height = out_height ? out_height : info.height_single();
+                } else if(resize_scaling_mode == ROCAL_SCALING_MODE_NOT_SMALLER) {
+                    max_out_width = (out_width ? out_width : out_height) * MAX_ASPECT_RATIO;
+                    max_out_height = (out_height ? out_height : out_width) * MAX_ASPECT_RATIO;
+                } else {
+                    max_out_width = out_width ? out_width : out_height * MAX_ASPECT_RATIO;
+                    max_out_height = out_height ? out_height : out_width * MAX_ASPECT_RATIO;
+                }
+                if(maximum_size.size() == 2) {
+                    max_out_width = maximum_size[0] ? maximum_size[0] : max_out_width;
+                    max_out_height = maximum_size[1] ? maximum_size[1] : max_out_height;
+                }
+            }
+
+            // set the width and height in the output info
             // For the resize node, user can create an image with a different width and height
             ImageInfo output_info = info;
-            output_info.width(dest_width);
-            output_info.height(dest_height);
+            output_info.width(max_out_width);
+            output_info.height(max_out_height);
 
             resize_output = context->master_graph->create_image(output_info, false);
 
@@ -2244,6 +2269,7 @@ rocalVideoFileResize(
             resize_output->reset_image_roi();
 
             std::shared_ptr<ResizeNode> resize_node =  context->master_graph->add_node<ResizeNode>({output}, {resize_output});
+            resize_node->init(out_width, out_height, resize_scaling_mode, maximum_size, interpolation_type);
             if (context->master_graph->meta_data_graph())
                 context->master_graph->meta_add_node<ResizeMetaNode,ResizeNode>(resize_node);
 
@@ -2288,7 +2314,12 @@ rocalVideoFileResizeSingleShard(
         bool loop,
         unsigned step,
         unsigned stride,
-        bool file_list_frame_num)
+        bool file_list_frame_num,
+        RocalResizeScalingMode scaling_mode,
+        std::vector<unsigned> max_size,
+        unsigned resize_shorter,
+        unsigned resize_longer,
+        RocalResizeInterpolationType interpolation_type)
 {
     Image* resize_output = nullptr;
     if (p_context == nullptr) {
@@ -2310,9 +2341,6 @@ rocalVideoFileResizeSingleShard(
 
         if(shard_id >= shard_count)
             THROW("Shard id should be smaller than shard count")
-
-        if(dest_width == 0 || dest_height == 0)
-            THROW("Invalid dest_width/dest_height values passed as input")
 
         // Set default step and stride values if 0 is passed
         step = (step == 0)? sequence_length : step;
@@ -2351,16 +2379,76 @@ rocalVideoFileResizeSingleShard(
 
         if(dest_width != video_prop.width && dest_height != video_prop.height)
         {
+            if((dest_width | dest_height | resize_longer | resize_shorter) == 0)
+                THROW("Atleast one size 'dest_width' or 'dest_height' or 'resize_shorter' or 'resize_longer' must be specified")
+            if((dest_width | dest_height) && (resize_longer | resize_shorter))
+                THROW("Only one method of specifying size can be used \ndest_width and/or dest_height\nresize_shorter\nresize_longer")
+            if(resize_longer && resize_shorter)
+                THROW("'resize_longer' and 'resize_shorter' cannot be passed together. They are mutually exclusive.")
+
+            unsigned out_width, out_height;
+            RocalResizeScalingMode resize_scaling_mode;
+
+            // Change the scaling mode if resize_shorter or resize_longer is specified
+            if(resize_shorter) {
+                resize_scaling_mode = RocalResizeScalingMode::ROCAL_SCALING_MODE_NOT_SMALLER;
+                out_width = out_height = resize_shorter;
+            } else if(resize_longer) {
+                resize_scaling_mode = RocalResizeScalingMode::ROCAL_SCALING_MODE_NOT_LARGER;
+                out_width = out_height = resize_longer;
+            } else {
+                resize_scaling_mode = scaling_mode;
+                out_width = dest_width;
+                out_height = dest_height;
+            }
+
+            std::vector<unsigned> maximum_size;
+            if (max_size.size()) {
+                if(max_size.size() == 1) {
+                    maximum_size = {max_size[0], max_size[0]};
+                } else if(max_size.size() == 2) {
+                    maximum_size = {max_size[0], max_size[1]}; // {width, height}
+                } else {
+                    THROW("The length of max_size vector exceeds the image dimension.")
+                }
+            }
+
+            // Determine the max width and height to be set to the output info
+            unsigned max_out_width, max_out_height;
+            if (maximum_size.size() && maximum_size[0] != 0 && maximum_size[1] != 0) {
+                // If max_size is passed by the user, the resized images cannot exceed the max size,
+                max_out_width = maximum_size[0];
+                max_out_height = maximum_size[1];
+            } else {
+                // compute the output info width and height wrt the scaling modes and roi passed
+                if(resize_scaling_mode == ROCAL_SCALING_MODE_STRETCH) {
+                    max_out_width = out_width ? out_width : info.width();
+                    max_out_height = out_height ? out_height : info.height_single();
+                } else if(resize_scaling_mode == ROCAL_SCALING_MODE_NOT_SMALLER) {
+                    max_out_width = (out_width ? out_width : out_height) * MAX_ASPECT_RATIO;
+                    max_out_height = (out_height ? out_height : out_width) * MAX_ASPECT_RATIO;
+                } else {
+                    max_out_width = out_width ? out_width : out_height * MAX_ASPECT_RATIO;
+                    max_out_height = out_height ? out_height : out_width * MAX_ASPECT_RATIO;
+                }
+                if(maximum_size.size() == 2) {
+                    max_out_width = maximum_size[0] ? maximum_size[0] : max_out_width;
+                    max_out_height = maximum_size[1] ? maximum_size[1] : max_out_height;
+                }
+            }
+
+            // set the width and height in the output info
             // For the resize node, user can create an image with a different width and height
             ImageInfo output_info = info;
-            output_info.width(dest_width);
-            output_info.height(dest_height);
+            output_info.width(max_out_width);
+            output_info.height(max_out_height);
 
             resize_output = context->master_graph->create_image(output_info, false);
             // For the nodes that user provides the output size the dimension of all the images after this node will be fixed and equal to that size
             resize_output->reset_image_roi();
 
             std::shared_ptr<ResizeNode> resize_node =  context->master_graph->add_node<ResizeNode>({output}, {resize_output});
+            resize_node->init(out_width, out_height, resize_scaling_mode, maximum_size, interpolation_type);
             if (context->master_graph->meta_data_graph())
                 context->master_graph->meta_add_node<ResizeMetaNode,ResizeNode>(resize_node);
 

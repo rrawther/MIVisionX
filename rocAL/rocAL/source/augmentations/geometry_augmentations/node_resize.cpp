@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -47,16 +47,22 @@ void ResizeNode::create_node() {
     height_status = vxAddArrayItems(_dst_roi_height, _batch_size, dst_roi_height.data(), sizeof(vx_uint32));
      if(width_status != 0 || height_status != 0)
         THROW(" vxAddArrayItems failed in the resize (vxExtrppNode_ResizebatchPD) node: "+ TOSTR(width_status) + "  "+ TOSTR(height_status))
+#if ENABLE_OPENCL
+    // fall back to batch_pd version since there is no tensor implementation for OPENCL    
+    _node = vxExtrppNode_ResizebatchPD(_graph->get(), _inputs[0]->handle(), _src_roi_width, _src_roi_height, _outputs[0]->handle(), _dst_roi_width, _dst_roi_height, _batch_size);
+#else
    _node = vxExtrppNode_Resizetensor(_graph->get(), _inputs[0]->handle(), _src_roi_width, _src_roi_height, _outputs[0]->handle(), _dst_roi_width, _dst_roi_height, _interpolation_type, _batch_size);
+#endif
     vx_status status;
     if((status = vxGetStatus((vx_reference)_node)) != VX_SUCCESS)
-        THROW("Adding the resize (vxExtrppNode_ResizebatchPD) node failed: "+ TOSTR(status))
+        THROW("Adding the resize (vxExtrppNode_Resizetensor) node failed: "+ TOSTR(status))
 }
 
 void ResizeNode::update_node() {
     std::vector<uint32_t> src_h_dims, src_w_dims;
-    src_w_dims = _inputs[0]->info().get_roi_width_vec();
-    src_h_dims = _inputs[0]->info().get_roi_height_vec();
+    // Using original width and height instead of the decoded width and height for computing resize dimensions
+    src_w_dims = _inputs[0]->info().get_original_width_vec();
+    src_h_dims = _inputs[0]->info().get_original_height_vec();
     for (unsigned i = 0; i < _batch_size; i++) {
         _src_width = src_w_dims[i];
         _src_height = src_h_dims[i];
@@ -123,10 +129,11 @@ void ResizeNode::adjust_out_roi_size() {
         }
         
         if (has_max_size) {
-            if (_max_width != 0) scale = std::min(scale, static_cast<float>(_max_width) / _src_width);
-            if (_max_height != 0) scale = std::min(scale, static_cast<float>(_max_height) / _src_height);
+            if (_max_width) scale = std::min(scale, static_cast<float>(_max_width) / _src_width);
+            if (_max_height) scale = std::min(scale, static_cast<float>(_max_height) / _src_height);
         }
 
         if ((scale_h != scale) || (!_dst_height)) _dst_height = std::lround(_src_height * scale);
+        if ((scale_w != scale) || (!_dst_width)) _dst_width = std::lround(_src_width * scale);
     }
 }

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2017 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,6 @@ THE SOFTWARE.
 
 extern void VX_CALLBACK log_callback(vx_context context, vx_reference ref, vx_status status, const vx_char string[]);
 
-
 #if ENABLE_HIP
 InferenceEngineHip::InferenceEngineHip(int sock_, Arguments * args_, const std::string clientName_, InfComCommand * cmd)
                   :InferenceEngine(sock_, args_, clientName_, cmd),
@@ -69,7 +68,7 @@ InferenceEngineHip::~InferenceEngineHip()
     if(openvx_context) {
         vxReleaseContext(&openvx_context);
     }
-#elif INFERENCE_SCHEDULER_MODE == LIBRE_INFERENCE_SCHEDULER
+#elif INFERENCE_SCHEDULER_MODE == LIBRE_INFERENCE_SCHEDULER        
     // wait for all threads to complete and release all resources
     std::tuple<int,char*,int> endOfSequenceInput(-1,nullptr,0);
     inputQ.enqueue(endOfSequenceInput);
@@ -656,7 +655,7 @@ int InferenceEngineHip::run()
                     }
                     else
                     {
-                        // allocate and receive the image and EOF market
+                        // allocate and receive the image and EOF marker
                         byteStream = new char [size];
                         ERRCHK(recvBuffer(sock, byteStream, size, clientName));
                     }
@@ -847,7 +846,7 @@ void InferenceEngineHip::workDeviceInputCopy(int gpu)
                 batch_q.push_back(image);
             }
             if (inputCount){
-                PROFILER_START(inference_server_app, workDeviceInputCopyJpegDecode);
+                PROFILER_START(inference_server_app, workDeviceInputCopyJpegDecode);    
 #if 0            
                 if (inputCount < batchSize)
                 {

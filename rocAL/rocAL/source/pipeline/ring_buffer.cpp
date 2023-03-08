@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -134,16 +134,18 @@ void RingBuffer::init(RocalMemType mem_type, DeviceResources dev, unsigned sub_b
 #endif
 {
     _mem_type = mem_type;
-    _dev = dev;
+    _dev = devres;
     _sub_buffer_size = sub_buffer_size;
     _sub_buffer_count = sub_buffer_count;
     if(BUFF_DEPTH < 2)
         THROW ("Error internal buffer size for the ring buffer should be greater than one")
 
+#if ENABLE_OPENCL
+    DeviceResources *dev_ocl = static_cast<DeviceResources *>(_dev);
     // Allocating buffers
     if(mem_type== RocalMemType::OCL)
     {
-        if(_dev.cmd_queue == nullptr || _dev.device_id == nullptr || _dev.context == nullptr)
+        if(dev_ocl->cmd_queue == nullptr || dev_ocl->device_id == nullptr || dev_ocl->context == nullptr)
             THROW("Error ocl structure needed since memory type is OCL");
 
         cl_int err = CL_SUCCESS;
@@ -203,9 +205,9 @@ void RingBuffer::init(RocalMemType mem_type, DeviceResources dev, unsigned sub_b
 
 #else
 #if ENABLE_TENSOR_PIPELINE
-void RingBuffer::init(RocalMemType mem_type, DeviceResourcesHip dev, std::vector<size_t> &sub_buffer_size, unsigned sub_buffer_count)
+void RingBuffer::init(RocalMemType mem_type, void *dev, std::vector<size_t> &sub_buffer_size, unsigned sub_buffer_count)
 #else
-void RingBuffer::init(RocalMemType mem_type, DeviceResourcesHip dev, unsigned sub_buffer_size, unsigned sub_buffer_count)
+void RingBuffer::init(RocalMemType mem_type, void *dev, unsigned sub_buffer_size, unsigned sub_buffer_count)
 #endif
 {
     _mem_type = mem_type;
@@ -218,7 +220,7 @@ void RingBuffer::init(RocalMemType mem_type, DeviceResourcesHip dev, unsigned su
     // Allocating buffers
     if(_mem_type == RocalMemType::HIP)
     {
-        if(_devhip.hip_stream == nullptr || _devhip.device_id == -1 )
+        if(dev_hip->device_id == -1 )
             THROW("Error Hip Device is not initialzed");
 
 
@@ -249,8 +251,9 @@ void RingBuffer::init(RocalMemType mem_type, DeviceResourcesHip dev, unsigned su
 
         }
     }
-    else
+   else
     {
+#endif
         _host_sub_buffers.resize(BUFF_DEPTH);
         for(size_t buffIdx = 0; buffIdx < BUFF_DEPTH; buffIdx++)
         {
@@ -266,17 +269,19 @@ void RingBuffer::init(RocalMemType mem_type, DeviceResourcesHip dev, unsigned su
                 _host_sub_buffers[buffIdx][sub_buff_idx] = (unsigned char*)_host_master_buffers[buffIdx] + _sub_buffer_size * sub_buff_idx;
 #endif                
         }
+#if ENABLE_OPENCL || ENABLE_HIP
     }
+#endif    
 }
 #endif
-
 
 void RingBuffer::initBoxEncoderMetaData(RocalMemType mem_type, size_t encoded_bbox_size, size_t encoded_labels_size)
 {
 #if ENABLE_HIP
+    DeviceResourcesHip *dev_hip = static_cast<DeviceResourcesHip *>(_dev);
     if(_mem_type == RocalMemType::HIP)
     {
-        if(_devhip.hip_stream == nullptr || _devhip.device_id == -1 )
+        if(dev_hip->hip_stream == nullptr || dev_hip->device_id == -1 )
             THROW("initBoxEncoderMetaData::Error Hip Device is not initialzed");
         hipError_t err;
         for(size_t buffIdx = 0; buffIdx < BUFF_DEPTH; buffIdx++)
@@ -299,19 +304,19 @@ void RingBuffer::initBoxEncoderMetaData(RocalMemType mem_type, size_t encoded_bb
 #else
     if(mem_type== RocalMemType::OCL)
     {
-        if(_dev.cmd_queue == nullptr || _dev.device_id == nullptr || _dev.context == nullptr)
+        if(dev_ocl->cmd_queue == nullptr || dev_ocl->device_id == nullptr || dev_ocl->context == nullptr)
             THROW("Error ocl structure needed since memory type is OCL");
 
        cl_int err = CL_SUCCESS;
        for(size_t buffIdx = 0; buffIdx < BUFF_DEPTH; buffIdx++)
         {
-            _dev_bbox_buffer[buffIdx] =  clCreateBuffer(_dev.context, CL_MEM_READ_WRITE, encoded_bbox_size, NULL, &err);
+            _dev_bbox_buffer[buffIdx] =  clCreateBuffer(dev_ocl->context, CL_MEM_READ_WRITE, encoded_bbox_size, NULL, &err);
             if(err)
             {
                 _dev_bbox_buffer.clear();
                 THROW("clCreateBuffer of size " + TOSTR(encoded_bbox_size) +" failed " + TOSTR(err));
             }
-            _dev_labels_buffer[buffIdx] =  clCreateBuffer(_dev.context, CL_MEM_READ_WRITE, encoded_labels_size, NULL, &err);
+            _dev_labels_buffer[buffIdx] =  clCreateBuffer(dev_ocl->context, CL_MEM_READ_WRITE, encoded_labels_size, NULL, &err);
             if(err)
             {
                 _dev_labels_buffer.clear();

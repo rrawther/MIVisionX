@@ -1,4 +1,4 @@
-# Copyright (c) 2018 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2018 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,7 @@ if [[ $# -eq 1 ]]; then
     do
         echo "Going to install $WHEEL_NAME"
     done
-    python$PYTHON_VERSION -m pip uninstall $WHEEL_NAME
+    python$PYTHON_VERSION -m pip uninstall -y $WHEEL_NAME
     python$PYTHON_VERSION -m pip install $WHEEL_NAME
   else
     echo
@@ -63,6 +63,6 @@ else
   do
     echo "Going to install $WHEEL_NAME"
   done
-  python$PYTHON_VERSION -m pip uninstall $WHEEL_NAME
+  python$PYTHON_VERSION -m pip uninstall -y $WHEEL_NAME
   python$PYTHON_VERSION -m pip install $WHEEL_NAME
 fi

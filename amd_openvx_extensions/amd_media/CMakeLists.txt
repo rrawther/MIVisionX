@@ -1,4 +1,4 @@
-# Copyright (c) 2015 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2015 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -37,7 +37,7 @@ if(GPU_SUPPORT AND "${BACKEND}" STREQUAL "OPENCL")
 elseif (GPU_SUPPORT AND "${BACKEND}" STREQUAL "HIP")
     set(OpenCL_FOUND FALSE)
     set(ENABLE_HIP 1)
-    list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/hip ${ROCM_PATH})
+    list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH} ${ROCM_PATH}/hip)
     find_package(HIP REQUIRED)
     list(APPEND PACKAGE_DEPENDS PACKAGE HIP)
     add_definitions(-DENABLE_OPENCL=${ENABLE_OPENCL} -DENABLE_HIP=${ENABLE_HIP} -D__HIP_PLATFORM_AMD__)
@@ -79,8 +79,10 @@ endif()
 
 # install MIVisionX libs -- {ROCM_PATH}/lib
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-# install MIVisionX include files -- {ROCM_PATH}/include/mivisionx/
-install(FILES include/vx_amd_media.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mivisionx)
+if(BUILD_DEV)
+    # install MIVisionX include files -- {ROCM_PATH}/include/mivisionx/
+    install(FILES include/vx_amd_media.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mivisionx)
+endif(BUILD_DEV)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")

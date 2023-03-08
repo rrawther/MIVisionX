@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-#if !ENABLE_HIP
+#if ENABLE_OPENCL
 #include <CL/cl.h>
 #endif
 #include <vx_ext_amd.h>
@@ -123,9 +123,11 @@ MasterGraph::MasterGraph(size_t batch_size, RocalAffinity affinity, int gpu_id, 
         _user_batch_size(batch_size),
 #if ENABLE_HIP
         _mem_type ((_affinity == RocalAffinity::GPU) ? RocalMemType::HIP : RocalMemType::HOST),
-#else
+#elif ENABLE_OPENCL
         _mem_type ((_affinity == RocalAffinity::GPU) ? RocalMemType::OCL : RocalMemType::HOST),
-#endif
+#else
+        _mem_type (RocalMemType::HOST),
+#endif        
         _first_run(true),
         _processing(false),
         _internal_batch_size(compute_optimum_internal_batch_size(batch_size, affinity)),
@@ -149,7 +151,7 @@ MasterGraph::MasterGraph(size_t batch_size, RocalAffinity affinity, int gpu_id, 
 
         if(affinity == RocalAffinity::GPU)
         {
-#if !ENABLE_HIP
+#if ENABLE_OPENCL
             if (_mem_type == RocalMemType::OCL){
                 cl_context _cl_context = nullptr;
                 cl_device_id _cl_device_id = nullptr;
@@ -159,7 +161,7 @@ MasterGraph::MasterGraph(size_t batch_size, RocalAffinity affinity, int gpu_id, 
                         &_cl_context, sizeof(cl_context)) != VX_SUCCESS))
                     THROW("vxSetContextAttribute for CL_CONTEXT failed " + TOSTR(status))
             }
-#else
+#elif ENABLE_HIP
             if (_mem_type == RocalMemType::HIP) {
                 hipError_t err = hipInit(0);
                 if (err != hipSuccess) {
@@ -200,7 +202,7 @@ MasterGraph::MasterGraph(size_t batch_size, RocalAffinity affinity, int gpu_id, 
         if(_affinity == RocalAffinity::GPU) {
 #if ENABLE_HIP
             _device.init_hip(_context);
-#else
+#elif ENABLE_OPENCL
             _device.init_ocl(_context);
 #endif
         }
@@ -278,22 +280,24 @@ MasterGraph::build()
 #if ENABLE_TENSOR_PIPELINE
     if (_output_tensors.empty())
         THROW("No output tensors are there, cannot create the pipeline")
-    _output_tensor_info = _output_tensors.front()->info();
+    //_output_tensor_info = _output_tensors.front()->info();
+    auto dev_res = _device.resources();
     for(auto&& output_tensor : _output_tensors)
       _tensor_data_size.push_back(output_tensor->info().data_size());
-    _ring_buffer.init(_mem_type, _device.resources(), _tensor_data_size, _output_tensors.size());
+    _ring_buffer.init(_mem_type, dev_res, _tensor_data_size, _output_tensors.size());
 
 #else
     if(_output_images.empty())
         THROW("No output images are there, cannot create the pipeline")
     // Verify all output images have the same dimension, otherwise creating a unified tensor from them is not supported
+    auto dev_res = _device.resources();
     _output_image_info = _output_images.front()->info();
     for(auto&& output_image : _output_images)
         if(!(output_image->info() == _output_image_info))
             THROW("Dimension of the output images do not match")
 
     allocate_output_tensor();
-    _ring_buffer.init(_mem_type, _device.resources(), output_byte_size(), _output_images.size());
+    _ring_buffer.init(_mem_type, dev_res, output_byte_size(), _output_images.size());
 #endif    
     if (_is_box_encoder) _ring_buffer.initBoxEncoderMetaData(_mem_type, _user_batch_size*_num_anchors*4*sizeof(float), _user_batch_size*_num_anchors*sizeof(int));
     create_single_graph();
@@ -359,6 +363,7 @@ MasterGraph::create_tensor(const rocalTensorInfo &info, bool is_output) {
     return output;
 }
 
+#if !ENABLE_TENSOR_PIPELINE
 
 void
 MasterGraph::set_output(Image* output_image)
@@ -377,6 +382,7 @@ MasterGraph::set_output(Image* output_image)
     }
 }
 
+#else
 //tensor variant for set_output
 void
 MasterGraph::set_output(rocalTensor* output_tensor)
@@ -395,6 +401,7 @@ MasterGraph::set_output(rocalTensor* output_tensor)
         add_node<CopyNode>({output_tensor}, {actual_output});
     }
 }
+#endif
 
 void MasterGraph::release()
 {
@@ -424,7 +431,7 @@ void MasterGraph::release()
         delete tensor;// It will call the vxReleaseTensor internally in the destructor
     for(auto& tensor: _output_tensors)
         delete tensor;// It will call the vxReleaseTensor internally in the destructor
-     _tensor_data_size->clear()   
+     _tensor_data_size.clear()   
 #endif
 
     if(_graph != nullptr)
@@ -437,11 +444,12 @@ void MasterGraph::release()
     _meta_data_reader = nullptr;
 }
 
-void load_module(const char *module_name, bool load_global=false) {
+void MasterGraph::load_module(const char *module_name, bool load_global) {
+    vx_status status;
     if ((status = vxLoadKernels(_context, module_name)) != VX_SUCCESS)
         THROW("Cannot load" + TOSTR(module_name) + "extension vxLoadKernels failed " + TOSTR(status))
     else
-        LOG(TOSTR(module_name) + " module loaded successfully")
+        LOG(std::string(module_name) + " module loaded successfully")
 }
 
 MasterGraph::Status
@@ -498,7 +506,7 @@ MasterGraph::sequence_frame_timestamps(std::vector<std::vector<float>> &sequence
 MasterGraph::Status
 MasterGraph::allocate_output_tensor()
 {
-#if !ENABLE_HIP
+#if ENABLE_OPENCL
     if(processing_on_device_ocl())
     {
         // creating a float buffer that can accommodates all output images
@@ -506,7 +514,7 @@ MasterGraph::allocate_output_tensor()
         cl_int ret = CL_SUCCESS;
         _output_tensor = nullptr;
         size_t size = output_buffer_size*sizeof(cl_float);
-        cl_mem clImgFloat  = clCreateBuffer(_device.resources().context,
+        cl_mem clImgFloat  = clCreateBuffer(_device.resources()->context,
                                             CL_MEM_READ_WRITE,
                                             size,
                                             nullptr, &ret);
@@ -516,17 +524,15 @@ MasterGraph::allocate_output_tensor()
 
         _output_tensor = clImgFloat;
     }
-#else
+#elif ENABLE_HIP
     if (processing_on_device_hip())
     {
-#if 1   // todo:: check if  _output_tensor memory for HIP is needed since application is responsible for passing output tensor pointer in device
         // creating a float buffer that can accommodates all output images
         size_t output_buffer_size = output_byte_size() * _output_images.size();
         size_t size = (_out_data_type==RocalTensorDataType::FP32)? output_buffer_size*sizeof(float): output_buffer_size*sizeof(half);
         hipError_t status = hipMalloc( &_output_tensor, size);
         if (status != hipSuccess || !_output_tensor )
             THROW("ROCAL::hipMalloc of size " + TOSTR(size) + " failed " + TOSTR(status))
-#endif
     }
 #endif
     return Status::OK;
@@ -535,10 +541,10 @@ MasterGraph::allocate_output_tensor()
 MasterGraph::Status
 MasterGraph::deallocate_output_tensor()
 {
-#if !ENABLE_HIP
+#if ENABLE_OPENCL
     if(processing_on_device_ocl() && _output_tensor != nullptr)
         clReleaseMemObject((cl_mem)_output_tensor );
-#else
+#elif ENABLE_HIP
     if(processing_on_device_hip() && _output_tensor != nullptr) {
         hipError_t err = hipFree(_output_tensor );
         if (err != hipSuccess) {
@@ -639,7 +645,7 @@ MasterGraph::copy_out_tensor(void *out_ptr, RocalTensorFormat format, float mult
     const size_t w = output_width();
     const size_t single_output_image_size = output_byte_size();
 
-#if !ENABLE_HIP
+#if ENABLE_OPENCL
     if(_output_image_info.mem_type() == RocalMemType::OCL)
     {
         if(output_data_type == RocalTensorDataType::FP16)
@@ -654,7 +660,7 @@ MasterGraph::copy_out_tensor(void *out_ptr, RocalTensorFormat format, float mult
 
         auto kernel_name = (format == RocalTensorFormat::NHWC)? "copyInt8ToNHWC" : "copyInt8ToNCHW";
         cl_kernel kernel = _device["utility"][kernel_name];
-        auto queue = _device.resources().cmd_queue;
+        auto queue = _device.resources()->cmd_queue;
         unsigned dest_buf_offset = 0;
         auto output_buffers =_ring_buffer.get_read_buffers();
         for( auto&& out_image: output_buffers)
@@ -697,7 +703,7 @@ MasterGraph::copy_out_tensor(void *out_ptr, RocalTensorFormat format, float mult
                                          0 , nullptr, nullptr)) != CL_SUCCESS)
             THROW("clEnqueueReadBuffer failed: " + TOSTR(status))
     }
-#else
+#elif ENABLE_HIP
     if(_output_image_info.mem_type() == RocalMemType::HIP)
     {
         unsigned int fp16 = (output_data_type == RocalTensorDataType::FP16);
@@ -711,12 +717,12 @@ MasterGraph::copy_out_tensor(void *out_ptr, RocalTensorFormat format, float mult
             auto img_buffer = out_image;
             if (format == RocalTensorFormat::NHWC)
             {
-                HipExecCopyInt8ToNHWC(_device.resources().hip_stream, (const void *)img_buffer, out_ptr, dest_buf_offset, n, c, h, w,
+                HipExecCopyInt8ToNHWC(_device.resources()->hip_stream, (const void *)img_buffer, out_ptr, dest_buf_offset, n, c, h, w,
                                         multiplier0, multiplier1, multiplier2, offset0, offset1, offset2, reverse_channels, fp16);
 
             }else
             {
-                HipExecCopyInt8ToNCHW(_device.resources().hip_stream, (const void *)img_buffer, out_ptr, dest_buf_offset, n, c, h, w,
+                HipExecCopyInt8ToNCHW(_device.resources()->hip_stream, (const void *)img_buffer, out_ptr, dest_buf_offset, n, c, h, w,
                                         multiplier0, multiplier1, multiplier2, offset0, offset1, offset2, reverse_channels, fp16);
             }
             dest_buf_offset += single_output_image_size;
@@ -733,7 +739,7 @@ MasterGraph::copy_out_tensor(void *out_ptr, RocalTensorFormat format, float mult
         for( auto&& out_image: output_buffers)
         {
             unsigned int single_image_size = w * c * h;
-            #pragma omp parallel for
+            #pragma omp parallel for num_threads(_internal_batch_size)
             for(unsigned int batchCount = 0; batchCount < n; batchCount ++)
             {
                 size_t dest_buf_offset = dest_buf_offset_start + single_image_size*batchCount;
@@ -944,9 +950,11 @@ MasterGraph::copy_output(unsigned char *out_ptr, size_t out_size_in_bytes)
     size_t dest_buf_offset = 0;
 
     _convert_time.start();
-#if !ENABLE_HIP
+
+#if ENABLE_OPENCL
     if(processing_on_device_ocl())
     {
+        size_t dest_buf_offset = 0;
         //NOTE: the CL_TRUE flag is only used on the last buffer read call,
         // to avoid unnecessary sequence of synchronizations
 
@@ -957,7 +965,7 @@ MasterGraph::copy_output(unsigned char *out_ptr, size_t out_size_in_bytes)
         {
             bool sync_flag = (--out_image_idx == 0) ? CL_TRUE : CL_FALSE;
             cl_int status;
-            if((status = clEnqueueReadBuffer(_device.resources().cmd_queue,
+            if((status = clEnqueueReadBuffer(_device.resources()->cmd_queue,
                                              (cl_mem) output_handle,
                                              sync_flag?(CL_TRUE):CL_FALSE,
                                              0,
@@ -968,33 +976,36 @@ MasterGraph::copy_output(unsigned char *out_ptr, size_t out_size_in_bytes)
             dest_buf_offset += size;
         }
     }
-#else
+    else {
+#elif ENABLE_HIP
     if(processing_on_device_hip())
     {
         //NOTE: the CL_TRUE flag is only used on the last buffer read call,
         // to avoid unnecessary sequence of synchronizations
 
         // get_read_buffers() calls block_if_empty() internally and blocks if buffers are empty until a new batch is processed
+        size_t dest_buf_offset = 0;
         auto output_buffers =_ring_buffer.get_read_buffers();
         for( auto&& output_handle: output_buffers)
         {
-            hipError_t err = hipMemcpyDtoHAsync((void *)(out_ptr+dest_buf_offset), output_handle, size, _device.resources().hip_stream);
+            hipError_t err = hipMemcpyDtoHAsync((void *)(out_ptr+dest_buf_offset), output_handle, size, _device.resources()->hip_stream);
             if (err) {
                 THROW("hipMemcpyDtoHAsync failed: " + TOSTR(err))
             }
             dest_buf_offset += size;
         }
         // sync to finish copy
-        if (hipStreamSynchronize(_device.resources().hip_stream) != hipSuccess)
+        if (hipStreamSynchronize(_device.resources()->hip_stream) != hipSuccess)
             THROW("hipStreamSynchronize failed for hipMemcpy ")
 
     }
+    else {
 #endif
-    else
-    {
         // get_host_master_read_buffer is blocking if _ring_buffer is empty, and blocks this thread till internal processing thread process a new batch and store in the _ring_buffer
         memcpy(out_ptr, _ring_buffer.get_host_master_read_buffer(), size * _output_images.size());
+#if ENABLE_OPENCL || ENABLE_HIP
     }
+#endif    
     _convert_time.end();
     return Status::OK;
 }
@@ -1489,7 +1500,7 @@ void MasterGraph::box_encoder(std::vector<float> &anchors, float criteria, const
 #if ENABLE_HIP
     // Intialize gpu box encoder if _mem_type is HIP
     if(_mem_type == RocalMemType::HIP) {
-        _box_encoder_gpu = new BoxEncoderGpu(_user_batch_size, anchors, criteria, means, inv_stds, offset, scale, _device.resources().hip_stream, _device.resources().dev_prop.canMapHostMemory);
+        _box_encoder_gpu = new BoxEncoderGpu(_user_batch_size, anchors, criteria, means, inv_stds, offset, scale, _device.resources()->hip_stream, _device.resources()->dev_prop.canMapHostMemory);
         return;
     }
 #endif
