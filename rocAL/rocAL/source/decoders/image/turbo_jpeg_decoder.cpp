@@ -23,6 +23,7 @@ THE SOFTWARE.
 #include <stdio.h>
 #include <commons.h>
 #include "turbo_jpeg_decoder.h"
+#include "libjpeg_extra.h"
 
 TJDecoder::TJDecoder(){
     m_jpegDecompressor = tjInitDecompress();
@@ -93,9 +94,8 @@ Decoder::Status TJDecoder::decode(unsigned char *input_buffer, size_t input_size
             if(original_image_width > (_max_scaling_factor*max_decoded_width))
             {
                 crop_width =  _max_scaling_factor*max_decoded_width;
-                if (crop_width > original_image_width) crop_width = original_image_width;
                 crop_height = crop_width * (1.0/in_ratio);
-                if (crop_height > _max_scaling_factor*max_decoded_width) crop_height = _max_scaling_factor*max_decoded_width;
+                if (crop_height > _max_scaling_factor*max_decoded_height) crop_height = _max_scaling_factor*max_decoded_height;
             }
             else if(original_image_height > (_max_scaling_factor*max_decoded_height))
             {

@@ -165,6 +165,7 @@ if(${BUILD_ROCAL})
                 ./include/augmentations/
                 ./include/decoders/image/
                 ./include/decoders/video/
+                ./include/decoders/libjpeg/
                 ./include/device/
                 ./include/loaders/
                 ./include/loaders/image/

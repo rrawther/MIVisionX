@@ -24,6 +24,7 @@ THE SOFTWARE.
 #include <commons.h>
 #include <string.h>
 #include "fused_crop_decoder.h"
+#include "libjpeg_extra.h"
 
 FusedCropTJDecoder::FusedCropTJDecoder(){
     m_jpegDecompressor = tjInitDecompress();
