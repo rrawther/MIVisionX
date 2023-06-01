@@ -29,6 +29,7 @@ THE SOFTWARE.
 #include "circular_buffer.h"
 #include "image_read_and_decode.h"
 #include "meta_data_reader.h"
+
 //
 // ImageLoader runs an internal thread for loading an decoding of images asynchronously
 // it uses a circular buffer to store decoded frames and images for the user
@@ -82,7 +83,7 @@ private:
     size_t _prefetch_queue_depth; // Used for circular buffer's internal buffer
     size_t _image_counter = 0;//!< How many images have been loaded already
     size_t _remaining_image_count;//!< How many images are there yet to be loaded
-    bool _decoder_keep_original = false;
+    unsigned int _loader_flags = 0;
     int _device_id;
 };
 

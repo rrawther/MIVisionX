@@ -142,7 +142,7 @@ ImageReadAndDecode::load(unsigned char* buff,
                          std::vector<uint32_t> &actual_width,
                          std::vector<uint32_t> &actual_height,
                          RocalColorFormat output_color_format,
-                         bool decoder_keep_original )
+                         unsigned int flags )
 {
     if(max_decoded_width == 0 || max_decoded_height == 0 )
         THROW("Zero image dimension is not valid")
@@ -155,7 +155,7 @@ ImageReadAndDecode::load(unsigned char* buff,
     const auto ret = interpret_color_format(output_color_format);
     const Decoder::ColorFormat decoder_color_format = std::get<0>(ret);
     const unsigned output_planes = std::get<1>(ret);
-    const bool keep_original = decoder_keep_original;
+    const unsigned int decoder_flags = flags;
     const size_t image_size = max_decoded_width * max_decoded_height * output_planes * sizeof(unsigned char);
 
     // Decode with the height and size equal to a single image
@@ -265,7 +265,7 @@ ImageReadAndDecode::load(unsigned char* buff,
                                     max_decoded_width, max_decoded_height,
                                     original_width, original_height,
                                     scaledw, scaledh,
-                                    decoder_color_format, _decoder_config, keep_original) != Decoder::Status::OK) {
+                                    decoder_color_format, _decoder_config, decoder_flags) != Decoder::Status::OK) {
             }
             _actual_decoded_width[i] = scaledw;
             _actual_decoded_height[i] = scaledh;

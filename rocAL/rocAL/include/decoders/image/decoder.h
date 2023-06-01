@@ -38,6 +38,11 @@ enum class DecoderType
     OVX_FFMPEG,//!< Uses FFMPEG to decode video streams, can decode up to 4 video streams simultaneously
 };
 
+//loader flags: used for controlling decoding
+#define IMAGE_LOADER_FLAGS_KEEP_ORIGINAL      0x00000001
+#define IMAGE_LOADER_FLAGS_USING_DEVICE_MEM   0x00000002
+#define IMAGE_LOADER_FLAGS_USING_HW_DECODER   0x00000004
+
 
 class DecoderConfig
 {
@@ -106,7 +111,7 @@ public:
                                    size_t max_decoded_width, size_t max_decoded_height,
                                    size_t original_image_width, size_t original_image_height,
                                    size_t &actual_decoded_width, size_t &actual_decoded_height,
-                                   Decoder::ColorFormat desired_decoded_color_format, DecoderConfig decoder_config, bool keep_original) = 0;
+                                   Decoder::ColorFormat desired_decoded_color_format, DecoderConfig decoder_config, unsigned int flags) = 0;
 
     virtual ~Decoder() = default;
     virtual void initialize(int device_id) = 0;

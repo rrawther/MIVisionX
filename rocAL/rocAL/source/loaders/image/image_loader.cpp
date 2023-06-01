@@ -142,10 +142,14 @@ void ImageLoader::initialize(ReaderConfig reader_cfg, DecoderConfig decoder_cfg,
     _mem_type = mem_type;
     _batch_size = batch_size;
     _loop = reader_cfg.loop();
-    _decoder_keep_original = decoder_keep_original;
+    if (decoder_keep_original) _loader_flags |= IMAGE_LOADER_FLAGS_KEEP_ORIGINAL;
+    if (decoder_cfg.type() == DecoderType::HW_JPEG_DEC) _loader_flags |= IMAGE_LOADER_FLAGS_USING_HW_DECODER;
     _image_loader = std::make_shared<ImageReadAndDecode>();
     size_t shard_count = reader_cfg.get_shard_count();
     int device_id = reader_cfg.get_shard_id();
+    //if(((_mem_type== RocalMemType::OCL) || (_mem_type== RocalMemType::HIP)) && (_loader_flags & IMAGE_LOADER_FLAGS_USING_HW_DECODER))
+    //    _loader_flags |= IMAGE_LOADER_FLAGS_USING_DEVICE_MEM;         // use interop for hw decoding
+   
     try
     {
         // set the device_id for decoder same as shard_id for number of shards > 1
@@ -190,7 +194,15 @@ ImageLoader::load_routine()
 
     while (_internal_thread_running)
     {
-        auto data = _circ_buff.get_write_buffer();
+        unsigned char *data;
+        if(_loader_flags & IMAGE_LOADER_FLAGS_USING_DEVICE_MEM)
+        {
+            data = (unsigned char *)_circ_buff.get_write_buffer_dev();
+
+        } else {
+            data = _circ_buff.get_write_buffer();
+        }
+
         if (!_internal_thread_running)
             break;
 
@@ -204,7 +216,7 @@ ImageLoader::load_routine()
                                               _decoded_img_info._roi_height,
                                               _decoded_img_info._original_width,
                                               _decoded_img_info._original_height,
-                                              _output_image->info().color_format(), _decoder_keep_original);
+                                              _output_image->info().color_format(), _loader_flags);
 
 
             if (load_status == LoaderModuleStatus::OK)

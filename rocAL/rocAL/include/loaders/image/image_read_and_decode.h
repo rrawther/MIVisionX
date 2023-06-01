@@ -71,7 +71,7 @@ public:
             std::vector<uint32_t> &actual_width,
             std::vector<uint32_t> &actual_height,
             RocalColorFormat output_color_format,
-            bool decoder_keep_original=false);
+            unsigned int flags=0);
 
     //! returns timing info or other status information
     Timing timing();

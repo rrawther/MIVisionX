@@ -220,7 +220,7 @@ Decoder::Status HWJpegDecoder::decode(unsigned char *input_buffer, size_t input_
                                   size_t max_decoded_width, size_t max_decoded_height,
                                   size_t original_image_width, size_t original_image_height,
                                   size_t &actual_decoded_width, size_t &actual_decoded_height,
-                                  Decoder::ColorFormat desired_decoded_color_format, DecoderConfig config, bool keep_original_size)
+                                  Decoder::ColorFormat desired_decoded_color_format, DecoderConfig config, unsigned int flags)
 {
     Decoder::Status status = Status::OK;
 
@@ -299,6 +299,10 @@ Decoder::Status HWJpegDecoder::decode(unsigned char *input_buffer, size_t input_
         {
             ret = avcodec_receive_frame(_video_dec_ctx, dec_frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+            if (ret < 0) {
+                ERR("HardWareJpegDecoder::avcodec_receive_frame failed\n");
+                break;
+            }
             //retrieve data from GPU to CPU
             if ((av_hwframe_transfer_data(sw_frame, dec_frame, 0)) < 0) {
                 ERR("HardWareVideoDecoder::Decode avcodec_receive_frame() failed");
@@ -314,16 +318,13 @@ Decoder::Status HWJpegDecoder::decode(unsigned char *input_buffer, size_t input_
                 // copy from frame to out_buffer
                 memcpy(output_buffer, sw_frame->data[0], sw_frame->linesize[0] * max_decoded_height);
             }
-            av_frame_unref(sw_frame);
-            av_frame_unref(dec_frame);
             av_packet_unref(&pkt);
             output_buffer += image_size;
             frame_count++;
-            av_frame_unref(sw_frame);
-            av_frame_unref(dec_frame);
         }
-        av_packet_unref(&pkt);
     } while (!end_of_stream);
+
+    av_packet_unref(&pkt);
     av_frame_free(&dec_frame);
     av_frame_free(&sw_frame);
     sws_freeContext(swsctx);

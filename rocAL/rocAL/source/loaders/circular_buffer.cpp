@@ -82,6 +82,7 @@ unsigned char* CircularBuffer::get_read_buffer_host()
     return _host_buffer_ptrs[_read_ptr];
 }
 
+// get the write_buffer host pointer
 unsigned char*  CircularBuffer::get_write_buffer()
 {
     if(!_initialized)
@@ -89,6 +90,16 @@ unsigned char*  CircularBuffer::get_write_buffer()
     block_if_full();
     return(_host_buffer_ptrs[_write_ptr]);
 }
+
+//get write_buffer device pointer: used with hardware decoder and interop
+void*  CircularBuffer::get_write_buffer_dev()
+{
+    if(!_initialized)
+        THROW("Circular buffer not initialized")
+    block_if_full();
+    return(_dev_buffer[_write_ptr]);
+}
+
 
 void CircularBuffer::sync()
 {
