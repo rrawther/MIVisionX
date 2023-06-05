@@ -60,7 +60,7 @@ std::mutex g_mtx;           // mutex for critical section
 int thread_func(const char *path, int gpu_mode, RocalImageColor color_format, int shard_id, int num_shards, int dec_width, int dec_height, int batch_size, bool shuffle, bool display, int dec_mode )
 {
     std::unique_lock<std::mutex> lck (g_mtx,std::defer_lock);
-    std::cout << ">>> Running on " << (gpu_mode>=0?"GPU":"CPU") << "shard_id: " << shard_id << std::endl;
+    std::cout << ">>> Running on " << (gpu_mode>=0?"GPU":"CPU") << " shard_id: " << shard_id << std::endl;
     color_format = RocalImageColor::ROCAL_COLOR_RGB24;
     int gpu_id = (gpu_mode < 0)? 0: gpu_mode;
     RocalDecoderType dec_type = (RocalDecoderType) dec_mode;
