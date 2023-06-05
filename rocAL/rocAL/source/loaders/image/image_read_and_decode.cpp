@@ -83,6 +83,10 @@ ImageReadAndDecode::create(ReaderConfig reader_config, DecoderConfig decoder_con
     _original_width.resize(_batch_size);
     _decoder_config = decoder_config;
     _random_crop_dec_param = nullptr;
+    _num_threads = reader_config.get_cpu_num_threads();
+    // limit the number of hardware decoders equal to _num_threads to limit running out of hardware instances
+    _num_decoders = (_decoder_config._type == DecoderType::HW_JPEG_DEC)? _num_threads : batch_size;
+
     if (_decoder_config._type == DecoderType::FUSED_TURBO_JPEG) {
       auto random_aspect_ratio = decoder_config.get_random_aspect_ratio();
       auto random_area = decoder_config.get_random_area();
@@ -91,13 +95,12 @@ ImageReadAndDecode::create(ReaderConfig reader_config, DecoderConfig decoder_con
       _random_crop_dec_param = new RocalRandomCropDecParam(aspect_ratio_range, area_range, (int64_t)decoder_config.get_seed(), decoder_config.get_num_attempts(), _batch_size);
     }
     if ((_decoder_config._type != DecoderType::SKIP_DECODE)) {
-        for (int i = 0; i < batch_size; i++) {
+        for (size_t i = 0; i < _num_decoders; i++) {
             _compressed_buff[i].resize(MAX_COMPRESSED_SIZE); // If we don't need MAX_COMPRESSED_SIZE we can remove this & resize in load module
             _decoder[i] = create_decoder(decoder_config);
             _decoder[i]->initialize(device_id);
         }
     }
-    _num_threads = reader_config.get_cpu_num_threads();
     _reader = create_reader(reader_config);
 }
 
@@ -221,16 +224,17 @@ ImageReadAndDecode::load(unsigned char* buff,
         for (size_t i = 0; i < _batch_size; i++)
         {
             // initialize the actual decoded height and width with the maximum
+            size_t ndec = i % _num_decoders;        // circle through available decoders
             _actual_decoded_width[i] = max_decoded_width;
             _actual_decoded_height[i] = max_decoded_height;
             int original_width, original_height, jpeg_sub_samp;
-            if (_decoder[i]->decode_info(_compressed_buff[i].data(), _actual_read_size[i], &original_width, &original_height,
+            if (_decoder[ndec]->decode_info(_compressed_buff[i].data(), _actual_read_size[i], &original_width, &original_height,
                                          &jpeg_sub_samp) != Decoder::Status::OK) {
                     // Substituting the image which failed decoding with other image from the same batch
                     int j = ((i + 1) != _batch_size) ? _batch_size - 1 : _batch_size - 2;
                     while ((j >= 0)) 
                     {
-                        if (_decoder[i]->decode_info(_compressed_buff[j].data(), _actual_read_size[j], &original_width, &original_height,
+                        if (_decoder[ndec]->decode_info(_compressed_buff[j].data(), _actual_read_size[j], &original_width, &original_height,
                             &jpeg_sub_samp) == Decoder::Status::OK) 
                         {
                                 _image_names[i] =  _image_names[j];
@@ -252,16 +256,16 @@ ImageReadAndDecode::load(unsigned char* buff,
             _original_width[i] = original_width;
             // decode the image and get the actual decoded image width and height
             size_t scaledw, scaledh;
-            if (_decoder[i]->is_partial_decoder()) {
+            if (_decoder[ndec]->is_partial_decoder()) {
                 if (_randombboxcrop_meta_data_reader) {
-                  _decoder[i]->set_bbox_coords(_bbox_coords[i]); 
+                  _decoder[ndec]->set_bbox_coords(_bbox_coords[i]); 
                 } else if (_random_crop_dec_param) {
                   Shape dec_shape = {_original_height[i], _original_width[i]};
                   auto crop_window = _random_crop_dec_param->generate_crop_window(dec_shape, i);
-                  _decoder[i]->set_crop_window(crop_window);
+                  _decoder[ndec]->set_crop_window(crop_window);
                 }
             }
-            if (_decoder[i]->decode(_compressed_buff[i].data(), _compressed_image_size[i], _decompressed_buff_ptrs[i],
+            if (_decoder[ndec]->decode(_compressed_buff[i].data(), _compressed_image_size[i], _decompressed_buff_ptrs[i],
                                     max_decoded_width, max_decoded_height,
                                     original_width, original_height,
                                     scaledw, scaledh,

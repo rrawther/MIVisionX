@@ -67,7 +67,7 @@ int thread_func(const char *path, int gpu_mode, RocalImageColor color_format, in
 
     lck.lock();
     //looks like OpenVX has some issue loading kernels from multiple threads at the same time
-    auto handle = rocalCreate(batch_size, (gpu_mode<0)?RocalProcessMode::ROCAL_PROCESS_CPU:RocalProcessMode::ROCAL_PROCESS_GPU, gpu_id,1);
+    auto handle = rocalCreate(batch_size, (gpu_mode<0)?RocalProcessMode::ROCAL_PROCESS_CPU:RocalProcessMode::ROCAL_PROCESS_GPU, gpu_id, 8);
     lck.unlock();
     if(rocalGetStatus(handle) != ROCAL_OK)
     {
