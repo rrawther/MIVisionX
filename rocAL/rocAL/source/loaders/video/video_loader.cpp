@@ -132,8 +132,17 @@ void VideoLoader::initialize(VideoReaderConfig reader_cfg, VideoDecoderConfig de
     _sequence_count = _batch_size / _sequence_length;
     _decoder_keep_original = decoder_keep_original;
     _video_loader = std::make_shared<VideoReadAndDecode>();
+    size_t shard_count = reader_cfg.get_shard_count();
+    int device_id = reader_cfg.get_shard_id();
+
     try
     {
+        // set the device_id for decoder same as shard_id for number of shards > 1
+        //if (shard_count > 1)
+        //  _video_loader->create(reader_cfg, decoder_cfg, _batch_size, device_id);
+        //else
+        //  _video_loader->create(reader_cfg, decoder_cfg, _batch_size);
+
         _video_loader->create(reader_cfg, decoder_cfg, _batch_size);
     }
     catch (const std::exception &e)

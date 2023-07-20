@@ -147,8 +147,8 @@ void ImageLoader::initialize(ReaderConfig reader_cfg, DecoderConfig decoder_cfg,
     _image_loader = std::make_shared<ImageReadAndDecode>();
     size_t shard_count = reader_cfg.get_shard_count();
     int device_id = reader_cfg.get_shard_id();
-    //if(((_mem_type== RocalMemType::OCL) || (_mem_type== RocalMemType::HIP)) && (_loader_flags & IMAGE_LOADER_FLAGS_USING_HW_DECODER))
-    //    _loader_flags |= IMAGE_LOADER_FLAGS_USING_DEVICE_MEM;         // use interop for hw decoding
+    if(((_mem_type== RocalMemType::OCL) || (_mem_type== RocalMemType::HIP)) && (_loader_flags & IMAGE_LOADER_FLAGS_USING_HW_DECODER))
+        _loader_flags |= IMAGE_LOADER_FLAGS_USING_DEVICE_MEM;         // use interop for hw decoding
    
     try
     {

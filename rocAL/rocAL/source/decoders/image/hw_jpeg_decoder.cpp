@@ -26,7 +26,11 @@ THE SOFTWARE.
 #include <commons.h>
 #include <fstream>
 #include <string.h>
+#include <hip/hip_runtime.h>
+
 #include "hw_jpeg_decoder.h"
+
+#ifndef USE_VCNDECODE_API
 
 #define AVIO_CONTEXT_BUF_SIZE   32768     //32K
 
@@ -85,13 +89,25 @@ static int ReadFunc(void* ptr, uint8_t* buf, int buf_size)
 
     return buf_size;
 }
+#endif
 
 void HWJpegDecoder::initialize(int dev_id){
+
+#ifdef USE_VCNDECODE_API
+    _vcn_decoder = new VCNDecode(dev_id);
+    if (!_vcn_decoder || !_vcn_decoder->isJPEGHWDecoderSupported()) 
+        THROW("HardwareJpegDecoder::Initialize ERROR: vaapi is not supported for this device\n");
+#else
     int ret = 0;
     char device[128] = "";
     char* pdevice = NULL;
     int num_devices = 1; // default;
-    num_devices = num_hw_devices();
+    hipError_t hipStatus;
+
+    hipStatus = hipGetDeviceCount(&num_devices);
+    if ((hipStatus != hipSuccess) || num_devices < 1) {
+        THROW("HardwareJpegDecoder::Initialize ERROR: Could not find GPU device\n");
+    }
     if (dev_id >= 0) {
         snprintf(device, sizeof(device), "/dev/dri/renderD%d", (128 + (dev_id % num_devices)));
         pdevice = device;
@@ -106,33 +122,46 @@ void HWJpegDecoder::initialize(int dev_id){
     }
     else
         INFO("HardwareJpegDecoder::Initialize : Found vaapi device for the device\n");
+#endif        
 };
 
 
 Decoder::Status HWJpegDecoder::decode_info(unsigned char* input_buffer, size_t input_size, int* width, int* height, int* color_comps) 
 {
+#ifdef USE_VCNDECODE_API
+    if (!_vcn_decoder) {
+        ERR("HardwareJpegDecoder::not initialized");
+        return Status::UNSUPPORTED;
+    }
+    uint8_t nComponents;
+    vcnImageFormat_t subsampling;
+    if (!_vcn_decoder->getImageInfo(input_buffer, input_size, &nComponents, subsampling, (uint32_t *)width, (uint32_t *)height)) {
+        ERR("HardwareJpegDecoder::Failed decoding input stream");
+        return Status::CONTENT_DECODE_FAILED;
+    }
+#else
     struct buffer_data bd = { 0 };
     int ret = 0;
     bd.ptr  = input_buffer;
     bd.size = input_size;
+    AVCodec *_decoder = NULL;
 
     if (!(_fmt_ctx = avformat_alloc_context())) {
         return Status::NO_MEMORY;
     }
     
-    uint8_t *avio_ctx_buffer = new uint8_t[AVIO_CONTEXT_BUF_SIZE];
-    if (!avio_ctx_buffer) {
-        return Status::NO_MEMORY;
+    uint8_t * _avio_ctx_buffer = (uint8_t *)av_malloc(AVIO_CONTEXT_BUF_SIZE);
+    if (!_avio_ctx_buffer) {
+        THROW("HardwareJpegDecoder::Initialize ERROR: NO_MEMORY\n");
     }
-    _io_ctx = avio_alloc_context(avio_ctx_buffer, AVIO_CONTEXT_BUF_SIZE,
-                                  0, &bd, &ReadFunc, NULL, NULL);
+    _io_ctx = avio_alloc_context(_avio_ctx_buffer, AVIO_CONTEXT_BUF_SIZE,
+                                0, &bd, &ReadFunc, NULL, NULL);
     if (!_io_ctx) {
         return Status::NO_MEMORY;
     }
     
     _fmt_ctx->pb = _io_ctx;
     _fmt_ctx->flags |= AVFMT_FLAG_CUSTOM_IO;
-    //ret = avformat_open_input(&_fmt_ctx, NULL, NULL, NULL);
     ret = avformat_open_input(&_fmt_ctx, NULL, NULL, NULL);
     if (ret < 0) {
         ERR("HardwareJpegDecoder::avformat_open_input failed");
@@ -152,13 +181,15 @@ Decoder::Status HWJpegDecoder::decode_info(unsigned char* input_buffer, size_t i
     }
     _video_stream_idx = ret;
 
-    _video_dec_ctx = avcodec_alloc_context3(_decoder);
-    if (!_video_dec_ctx)
-    {
-        ERR("HardwareJpegDecoder::Initialize Failed to allocate the " +
-                STR(av_get_media_type_string(AVMEDIA_TYPE_VIDEO)) + " codec context");
-        return Status::NO_MEMORY;
-    }
+    //if (_video_dec_ctx == NULL) {
+        _video_dec_ctx = avcodec_alloc_context3(_decoder);
+        if (!_video_dec_ctx)
+        {
+            ERR("HardwareJpegDecoder::Initialize Failed to allocate the " +
+                    STR(av_get_media_type_string(AVMEDIA_TYPE_VIDEO)) + " codec context");
+            return Status::NO_MEMORY;
+        }
+    //}
     _video_stream = _fmt_ctx->streams[_video_stream_idx];
 
     if (!_video_stream)
@@ -179,19 +210,6 @@ Decoder::Status HWJpegDecoder::decode_info(unsigned char* input_buffer, size_t i
         return Status::NO_MEMORY;
     }
     _video_dec_ctx->get_format = get_vaapi_format;
-
-    // for config for vaapi
-    for (int i = 0; ; i++) {
-        const AVCodecHWConfig *config = avcodec_get_hw_config(_decoder, i);
-        if (!config) {
-            WRN("HardwareJpegDecoder::Initialize ERROR: decoder " + STR(_decoder->name) + " doesn't support device_type " + STR(av_hwdevice_get_type_name(hw_type)));
-            return Status::HEADER_DECODE_FAILED;
-        }
-        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && config->device_type == _hw_type) {
-            break;
-        }
-    }
-
     if (_video_dec_ctx->pix_fmt == AV_PIX_FMT_YUVJ420P)
       _dec_pix_fmt = AV_PIX_FMT_NV12;    // set non-depracated format, vaapi uses NV12 for YUVJ420P
     else if (_video_dec_ctx->pix_fmt == AV_PIX_FMT_YUVJ422P)
@@ -211,7 +229,7 @@ Decoder::Status HWJpegDecoder::decode_info(unsigned char* input_buffer, size_t i
     _codec_height = _video_stream->codecpar->height;
     *width = _codec_width;
     *height = _codec_height;
-
+#endif
     return Status::OK;
 }
 
@@ -222,9 +240,72 @@ Decoder::Status HWJpegDecoder::decode(unsigned char *input_buffer, size_t input_
                                   Decoder::ColorFormat desired_decoded_color_format, DecoderConfig config, unsigned int flags)
 {
     Decoder::Status status = Status::OK;
+#ifdef USE_VCNDECODE_API
+    if (!_vcn_decoder) {
+        ERR("HardwareJpegDecoder::not initialized");
+        return Status::UNSUPPORTED;
+    }
+    int64_t pts = 0;
+    _vcn_decoder->decode(input_buffer, input_size, pts); //kick of decoding
+    _vcn_decoder->getOutputImageInfo(&_out_imageinfo);
+    _codec_width = _out_imageinfo->nOutputWidth;
+    _codec_height = _out_imageinfo->nOutputHeight;
 
+    vcnImageFormat_t out_pix_fmt = VCN_FMT_RGB24;
+    int planes = 3;
+    switch (desired_decoded_color_format) {
+        case Decoder::ColorFormat::GRAY:
+            out_pix_fmt = VCN_FMT_RGB24;
+            planes = 1;
+        break;
+        case Decoder::ColorFormat::RGB:
+            out_pix_fmt = VCN_FMT_RGB24;
+        break;
+        default:
+            ERR("HardwareJpegDecoder::unsupported output format");
+            return Status::CONTENT_DECODE_FAILED;                
+        break;
+    };
+
+    auto is_scaling = (_codec_width > max_decoded_width) || (_codec_height > max_decoded_height);
+    auto is_format_change = (out_pix_fmt != _out_imageinfo->chromaFormat);
+    auto is_output_rgb = (out_pix_fmt == VCN_FMT_RGB24);
+
+    if (is_scaling) {
+        float scaled_h, scaled_w;
+        // calculate the scaling_w and scaling_height
+        if (_codec_width > _codec_height) {
+            scaled_h = _codec_height * (static_cast<float>(max_decoded_width) / _codec_width);
+            scaled_w = _codec_width * (static_cast<float>(scaled_h) / _codec_height);
+        } else {
+            scaled_w = _codec_width * (static_cast<float>(max_decoded_height) / _codec_height);
+            scaled_h = _codec_height * (static_cast<float>(scaled_h) / _codec_width);
+        }
+        _scale_w = std::lround(scaled_w), _scale_h = std::lround(scaled_h);        
+        if (!_scale_hstride) _scale_hstride = ALIGN16(max_decoded_width);     // make it for max resolution to avoid reallocation
+        if (!_scale_vstride) _scale_hstride = ALIGN16(max_decoded_height);     // make it for max resolution to avoid reallocation
+
+        allocateDevMemForYUVScaling()
+    }
+    // convert YUV to RGB format if the requested output frame format is RGB
+    if (is_output_rgb) {
+        if (!allocateDevMemForRGBConversion(&pRGBdevMem, alignedScalingHeight, scaledYUVstride, isScaling, vaDrmPrimeSurfaceDesc)) {
+            std::cout << "ERROR: allocating device memories for RGB conversion failed!" << std::endl;
+            return -1;
+        }
+        if (!colorConvertYUVtoRGB(pYUVdevMem, pScaledYUVdevMem, pRGBdevMem, scaledLumaSize, alignedScalingWidth, alignedScalingHeight, scaledYUVstride,
+            isScaling, vaDrmPrimeSurfaceDesc, hipStream)) {
+                std::cout << "ERROR: YUV to RGB color conversion failed!" << std::endl;
+                return -1;
+        }
+    }
+
+
+#else
     AVPixelFormat out_pix_fmt = AV_PIX_FMT_RGB24;
     int planes = 3;
+    hipExternalMemory_t hipExtMem;    // for interop
+    VADRMPRIMESurfaceDescriptor vaDrmPrimeSurfaceDesc = {};
 
     switch (desired_decoded_color_format) {
         case Decoder::ColorFormat::GRAY:
@@ -238,28 +319,36 @@ Decoder::Status HWJpegDecoder::decode(unsigned char *input_buffer, size_t input_
             out_pix_fmt = AV_PIX_FMT_BGR24;
         break;
     };
-    // Initialize the SwsContext 
     SwsContext *swsctx = nullptr;
-    if ((max_decoded_width != _codec_width) || (max_decoded_height != _codec_height) || (out_pix_fmt != _dec_pix_fmt))
-    {
-        swsctx = sws_getCachedContext(nullptr, _codec_width, _codec_height, _dec_pix_fmt,
-                                      max_decoded_width, max_decoded_height, out_pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
-        if (!swsctx)
-        {
-            ERR("HardwareJpegDecoder::Decode Failed to get sws_getCachedContext");
-            return Status::CONTENT_DECODE_FAILED;
+    AVFrame *sw_frame = nullptr;
+    auto is_scaling = (max_decoded_width != _codec_width) || (max_decoded_height != _codec_height);
+    auto is_format_change = (out_pix_fmt != _dec_pix_fmt);
+    if (!(flags & IMAGE_LOADER_FLAGS_USING_DEVICE_MEM)) {
+        // Initialize the SwsContext 
+        if (is_scaling || is_format_change) {
+            swsctx = sws_getCachedContext(nullptr, _codec_width, _codec_height, _dec_pix_fmt,
+                                          max_decoded_width, max_decoded_height, out_pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
+            if (!swsctx)
+            {
+                ERR("HardwareJpegDecoder::Decode Failed to get sws_getCachedContext");
+                return Status::CONTENT_DECODE_FAILED;
+            }
         }
-    }
+        sw_frame = av_frame_alloc();
+        if (!sw_frame) {
+            ERR("HardwareJpegDecoder::Decode couldn't allocate sw_frame");
+            return Status::NO_MEMORY;
+        }
+    } 
     AVFrame *dec_frame = av_frame_alloc();
-    AVFrame *sw_frame = av_frame_alloc();
-    if ( !dec_frame || !sw_frame) {
+    if ( !dec_frame) {
         ERR("HardwareJpegDecoder::Decode couldn't allocate dec_frame");
         return Status::NO_MEMORY;
     }
 
     unsigned frame_count = 0;
     bool end_of_stream = false;
-    AVPacket pkt;
+    AVPacket pkt = { 0 };
     uint8_t *dst_data[4] = {0};
     int dst_linesize[4] = {0};
     int image_size = max_decoded_height * max_decoded_width * planes * sizeof(unsigned char);
@@ -327,10 +416,12 @@ Decoder::Status HWJpegDecoder::decode(unsigned char *input_buffer, size_t input_
     av_frame_free(&dec_frame);
     av_frame_free(&sw_frame);
     sws_freeContext(swsctx);
-    avio_context_free(&_io_ctx);
     // release video_dec_context and fmt_context after each file decoding
-    avcodec_free_context(&_video_dec_ctx);
     avformat_close_input(&_fmt_ctx);
+    if (_io_ctx) av_freep(&_io_ctx->buffer);
+    avio_context_free(&_io_ctx);
+    avcodec_free_context(&_video_dec_ctx);
+#endif    
     actual_decoded_width = max_decoded_width;
     actual_decoded_height = max_decoded_height;
     return status;
@@ -338,16 +429,212 @@ Decoder::Status HWJpegDecoder::decode(unsigned char *input_buffer, size_t input_
 
 void HWJpegDecoder::release()
 {
+#ifdef USE_VCNDECODE_API
+    // release all allocated buffers
+#else
+    avformat_close_input(&_fmt_ctx);
+    _fmt_ctx = NULL;
+    if (_io_ctx) av_freep(&_io_ctx->buffer);
     avio_context_free(&_io_ctx);
-    if (_video_dec_ctx)
+    _io_ctx = NULL;
+    if (_video_dec_ctx) {
         avcodec_free_context(&_video_dec_ctx);
-    if (_fmt_ctx)
-        avformat_close_input(&_fmt_ctx);
+        _video_dec_ctx = NULL;
+    }
+    av_buffer_unref(&_hw_device_ctx);
+#endif
 }
 
 
 HWJpegDecoder::~HWJpegDecoder() {
     release();
 }
+
+bool HWJpegDecoder::allocate_scaled_yuv_devMem(void **pScaledYUVdevMem, void **pScaledUdevMem, void **pScaledVdevMem, size_t &scaledYUVimageSize,
+    uint32_t scaledLumaSize, uint32_t scaledYUVstride, uint32_t alignedScalingHeight) {
+
+    hipError_t hipStatus = hipSuccess;
+    uint32_t chromaHeight = 0;
+    uint32_t chromaStride = 0;
+    size_t chromaImageSize = 0;
+    size_t scaledChromaImageSize = 0;
+
+    switch (_out_imageinfo->chromaFormat) {
+        case VCN_FMT_YUV420:        // corresponds to NV12
+            scaledYUVimageSize = scaledYUVstride * (alignedScalingHeight + (alignedScalingHeight >> 1));
+            chromaHeight = _out_imageinfo->nOutputVStride / 2;
+            chromaStride = _out_imageinfo->nOutputHStride / 2;
+            chromaImageSize = chromaStride * chromaHeight;
+            scaledChromaImageSize = scaledYUVimageSize / 4;
+
+            if (*pScaledYUVdevMem == nullptr) {
+                hipStatus = hipMalloc(pScaledYUVdevMem, scaledYUVimageSize);
+                if (hipStatus != hipSuccess) {
+                    std::cout << "ERROR: hipMalloc failed to allocate the device memory for scaled YUV image!" << hipStatus << std::endl;
+                    return false;
+                }
+            }
+            if (*pScaledUdevMem == nullptr) {
+                hipStatus = hipMalloc(pScaledUdevMem, scaledChromaImageSize);
+                if (hipStatus != hipSuccess) {
+                    std::cout << "ERROR: hipMalloc failed to allocate the device memory for scaled U image!" << hipStatus << std::endl;
+                    return false;
+                }
+            }
+            if (*pScaledVdevMem == nullptr) {
+                hipStatus = hipMalloc(pScaledVdevMem, scaledChromaImageSize);
+                if (hipStatus != hipSuccess) {
+                    std::cout << "ERROR: hipMalloc failed to allocate the device memory for scaled V image!" << hipStatus << std::endl;
+                    return false;
+                }
+            }
+            break;
+        case VCN_FMT_YUV400:
+            if (*pScaledYUVdevMem == nullptr) {
+                hipStatus = hipMalloc(pScaledYUVdevMem, scaledLumaSize);
+                if (hipStatus != hipSuccess) {
+                    std::cout << "ERROR: hipMalloc failed to allocate the device memory for scaled YUV image!" << hipStatus << std::endl;
+                    return false;
+                }
+            }
+            break;
+        case VCN_FMT_YUV444:
+            scaledYUVimageSize = scaledYUVstride * alignedScalingHeight * 3;
+            if (*pScaledYUVdevMem == nullptr) {
+                hipStatus = hipMalloc(pScaledYUVdevMem, scaledYUVimageSize);
+                if (hipStatus != hipSuccess) {
+                    std::cout << "ERROR: hipMalloc failed to allocate the device memory for scaled YUV image!" << hipStatus << std::endl;
+                    return false;
+                }
+            }
+            break;
+        default:
+            std::cout << "Error! " << _out_imageinfo->chromaFormat << " format is not supported!" << std::endl;
+            return false;
+        }
+
+    return true;
+}
+
+
+// helper functions for scaling and color_format conversions
+bool HWJpegDecoder::scale_yuv_image(void *pYUVdevMem, void *pUVdevMem, void *pScaledYUVdevMem, void *pScaledUVdevMem, size_t scaledYUVimageSize, 
+                    uint32_t alignedScalingWidth, uint32_t alignedScalingHeight, uint32_t scaledYUVstride, uint32_t scaledLumaSize) {
+
+    hipError_t hipStatus = hipSuccess;
+    size_t lumaSize = _out_imageinfo->nOutputHStride * _out_imageinfo->nOutputHStride;
+    uint32_t chromaWidth = 0;
+    uint32_t chromaHeight = 0;
+    uint32_t chromaStride = 0;
+    size_t chromaImageSize = 0;
+    size_t scaledChromaImageSize = 0;
+    uint32_t uOffset = 0;
+
+    switch (_out_imageinfo->chromaFormat) {
+        case VCN_FMT_YUV420:
+            chromaWidth = _out_imageinfo->nOutputWidth / 2;
+            chromaHeight = _out_imageinfo->nOutputVStride / 2;
+            chromaStride = _out_imageinfo->nOutputHStride / 2;
+            chromaImageSize = chromaStride * chromaHeight;
+            scaledChromaImageSize = scaledYUVimageSize / 4;
+
+            //scale the Y, U, and V components of the NV12 image
+            HipExec_ScaleImage_NV12_Nearest(hipStream, alignedScalingWidth, alignedScalingHeight, reinterpret_cast<uint8_t *>(pScaledYUVdevMem), scaledYUVstride,
+                _out_imageinfo->nOutputWidth, _out_imageinfo->nOutputHeight, (const uint8_t *)pYUVdevMem, _out_imageinfo->nOutputHStride,
+                reinterpret_cast<uint8_t *>(pScaledUVdevMem), (const uint8_t *)pUVdevMem);
+
+            break;
+        case VCN_FMT_YUV400:
+            // if the surface format is YUV400, then there is only one Y component to scale
+            HipExec_ScaleImage_U8_U8_Nearest(hipStream, alignedScalingWidth, alignedScalingHeight, (uint8_t *)pScaledYUVdevMem, scaledYUVstride,
+                _out_imageinfo->nOutputWidth, _out_imageinfo->nOutputHeight, (const uint8_t *)pYUVdevMem, _out_imageinfo->nOutputHStride);
+
+            break;
+        case VCN_FMT_YUV444:
+            uint32_t uOffset_src = _out_imageinfo->nOutputVStride * _out_imageinfo->nOutputHStride;
+            uOffset = alignedScalingWidth * alignedScalingHeight;
+            HipExec_ScaleImage_YUV444_Nearest(hipStream, alignedScalingWidth, alignedScalingHeight,
+                (uint8_t *)pScaledYUVdevMem, scaledYUVstride, uOffset,
+                _out_imageinfo->nOutputWidth, _out_imageinfo->nOutputHeight, (const uint8_t *)pYUVdevMem,
+                _out_imageinfo->nOutputHStride, uOffset_src);
+
+            break;
+        default:
+            std::cout << "Error! " << _out_imageinfo->chromaFormat << " format is not supported!" << std::endl;
+            return false;
+        }
+
+        hipStatus = hipStreamSynchronize(hipStream);
+        if (hipStatus != hipSuccess) {
+            std::cout << "ERROR: hipStreamSynchronize failed! (" << hipStatus << ")" << std::endl;
+            return false;
+        }
+
+    return true;
+}
+
+bool HWJpegDecoder::allocateDevMemForRGBConversion(uint8_t **pRGBdevMem, uint32_t alignedHeight, uint32_t YUVstride) {
+
+    hipError_t hipStatus = hipSuccess;
+    size_t rgbImageStride = YUVstride * 3;
+
+    switch (_out_imageinfo->chromaFormat) {
+        case VCN_FMT_YUV420:
+        case VCN_FMT_YUV444:
+        case VCN_FMT_YUV400:
+            //allocate HIP device memory for RGB frame
+            if (*pRGBdevMem == nullptr) {
+                size_t rgbImageSize =  alignedHeight * rgbImageStride;
+                hipStatus = hipMalloc(pRGBdevMem, rgbImageSize);
+                if (hipStatus != hipSuccess) {
+                    std::cout << "ERROR: hipMalloc failed!" << hipStatus << std::endl;
+                    return false;
+                }
+            }
+            break;
+        default:
+            std::cout << "Error! " << _out_imageinfo->chromaFormat << " format is not supported!" << std::endl;
+            return false;
+    }
+
+    return true;
+}
+
+bool HWJpegDecoder::colorConvertYUVtoRGB(void *pYUVdevMem,  uint8_t *pRGBdevMem, uint32_t dstWidth, uint32_t dstHeight, uint32_t lumaSize, uint32_t lumaStride, uint32_t chromaStride, hipStream_t &hipStream) {
+
+    hipError_t hipStatus = hipSuccess;
+    size_t rgbImageStride = lumaStride * 3;
+
+    switch (_out_imageinfo->chromaFormat) {
+        case VCN_FMT_YUV420:
+            HipExec_ColorConvert_NV12_to_RGB(hipStream, dstWidth, dstHeight, static_cast<uint8_t *>(pRGBdevMem), rgbImageStride,
+            static_cast<const uint8_t *>(pYUVdevMem), lumaStride, (const uint8_t *)(pYUVdevMem) + lumaSize, chromaStride);
+            break;
+        case VA_FOURCC_444P:
+                HipExec_ColorConvert_YUV444_to_RGB(hipStream, dstWidth, dstHeight, (uint8_t *)pRGBdevMem, rgbImageStride,
+                    (const uint8_t *)pYUVdevMem, lumaStride, lumaSize);
+            break;
+        case VCN_FMT_YUV400:
+            // if the surface format is YUV400, then there is only one Y component to scale
+            HipExec_ColorConvert_YUV800_to_RGB(hipStream, dstWidth, dstHeight, (uint8_t *)pRGBdevMem, rgbImageStride,
+                (const uint8_t *)pYUVdevMem, lumaStride);
+
+            break;
+        default:
+            std::cout << "Error! " << _out_imageinfo->chromaFormat << " format is not supported!" << std::endl;
+            return false;
+    }
+
+    hipStatus = hipStreamSynchronize(hipStream);
+    if (hipStatus != hipSuccess) {
+        std::cout << "ERROR: hipStreamSynchronize failed! (" << hipStatus << ")" << std::endl;
+        return false;
+    }
+
+    return true;
+
+  }
+
+
 
 #endif

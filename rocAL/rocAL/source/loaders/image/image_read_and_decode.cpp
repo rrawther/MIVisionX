@@ -26,6 +26,9 @@ THE SOFTWARE.
 #include "decoder_factory.h"
 #include "image_read_and_decode.h"
 
+#define INSERT_EOF_MARKER   0
+
+
 std::tuple<Decoder::ColorFormat, unsigned >
 interpret_color_format(RocalColorFormat color_format )
 {
@@ -85,7 +88,7 @@ ImageReadAndDecode::create(ReaderConfig reader_config, DecoderConfig decoder_con
     _random_crop_dec_param = nullptr;
     _num_threads = reader_config.get_cpu_num_threads();
     // limit the number of hardware decoders equal to _num_threads to limit running out of hardware instances
-    _num_decoders = (_decoder_config._type == DecoderType::HW_JPEG_DEC)? _num_threads : batch_size;
+    _num_decoders = (_decoder_config._type == DecoderType::HW_JPEG_DEC)? std::min((int)_num_threads, batch_size) : batch_size;
 
     if (_decoder_config._type == DecoderType::FUSED_TURBO_JPEG) {
       auto random_aspect_ratio = decoder_config.get_random_aspect_ratio();
@@ -197,8 +200,16 @@ ImageReadAndDecode::load(unsigned char* buff,
                 WRN("Opened file " + _reader->id() + " of size 0");
                 continue;
             }
+#if INSERT_EOF_MARKER       
+            _compressed_buff[file_counter].reserve(fsize+2);
+            _actual_read_size[file_counter] = _reader->read_data(_compressed_buff[file_counter].data(), fsize);
+            unsigned char *eof_ptr = _compressed_buff[file_counter].data() + _actual_read_size[file_counter];
+            eof_ptr[0] = 0xD9, eof_ptr[1] = 0xFF;
+            _actual_read_size[file_counter] += 2;
+#else
             _compressed_buff[file_counter].reserve(fsize);
             _actual_read_size[file_counter] = _reader->read_data(_compressed_buff[file_counter].data(), fsize);
+#endif
             _image_names[file_counter] = _reader->id();
             _reader->close();
             _compressed_image_size[file_counter] = fsize;
