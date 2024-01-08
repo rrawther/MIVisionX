@@ -23,8 +23,6 @@ THE SOFTWARE.
 #include "video_decoder_factory.h"
 #include "video_read_and_decode.h"
 
-namespace filesys = boost::filesystem;
-
 #ifdef ROCAL_VIDEO
 std::tuple<VideoDecoder::ColorFormat, unsigned, AVPixelFormat>
 video_interpret_color_format(RocalColorFormat color_format)
@@ -51,7 +49,6 @@ VideoReadAndDecode::timing()
     Timing t;
     t.video_decode_time = _decode_time.get_timing();
     t.video_read_time = _file_load_time.get_timing();
-    t.shuffle_time = _video_reader->get_shuffle_time();
     return t;
 }
 

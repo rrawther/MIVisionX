@@ -103,14 +103,14 @@ namespace rocal{
                                 RocalTensorLayout tensor_format, RocalTensorOutputType tensor_output_type, float multiplier0,
                                 float multiplier1, float multiplier2, float offset0,
                                 float offset1, float offset2,
-                                bool reverse_channels)
+                                bool reverse_channels, RocalOutputMemType output_mem_type)
     {
         auto ptr = ctypes_void_ptr(p);
         // call pure C++ function
 
-        int status = rocalCopyToOutputTensor(context, ptr, tensor_format, tensor_output_type, multiplier0,
+        int status = rocalToTensor(context, ptr, tensor_format, tensor_output_type, multiplier0,
                                               multiplier1, multiplier2, offset0,
-                                              offset1, offset2, reverse_channels);
+                                              offset1, offset2, reverse_channels, output_mem_type);
         // std::cerr<<"\n Copy failed with status :: "<<status;
         return py::cast<py::none>(Py_None);
     }
@@ -119,14 +119,14 @@ namespace rocal{
                                 RocalTensorLayout tensor_format, float multiplier0,
                                 float multiplier1, float multiplier2, float offset0,
                                 float offset1, float offset2,
-                                bool reverse_channels)
+                                bool reverse_channels, RocalOutputMemType output_mem_type)
     {
         auto buf = array.request();
         float* ptr = (float*) buf.ptr;
         // call pure C++ function
-        int status = rocalCopyToOutputTensor32(context, ptr, tensor_format, multiplier0,
+        int status = rocalToTensor32(context, ptr, tensor_format, multiplier0,
                                               multiplier1, multiplier2, offset0,
-                                              offset1, offset2, reverse_channels);
+                                              offset1, offset2, reverse_channels, output_mem_type);
         // std::cerr<<"\n Copy failed with status :: "<<status;
         return py::cast<py::none>(Py_None);
     }
@@ -135,14 +135,14 @@ namespace rocal{
                                 RocalTensorLayout tensor_format, float multiplier0,
                                 float multiplier1, float multiplier2, float offset0,
                                 float offset1, float offset2,
-                                bool reverse_channels)
+                                bool reverse_channels, RocalOutputMemType output_mem_type)
     {
         auto buf = array.request();
         float16* ptr = (float16*) buf.ptr;
         // call pure C++ function
-        int status = rocalCopyToOutputTensor16(context, ptr, tensor_format, multiplier0,
+        int status = rocalToTensor16(context, ptr, tensor_format, multiplier0,
                                               multiplier1, multiplier2, offset0,
-                                              offset1, offset2, reverse_channels);
+                                              offset1, offset2, reverse_channels, output_mem_type);
         // std::cerr<<"\n Copy failed with status :: "<<status;
         return py::cast<py::none>(Py_None);
     }
@@ -151,13 +151,13 @@ namespace rocal{
                                 RocalTensorLayout tensor_format, float multiplier0,
                                 float multiplier1, float multiplier2, float offset0,
                                 float offset1, float offset2,
-                                bool reverse_channels)
+                                bool reverse_channels, RocalOutputMemType output_mem_type)
     {
         float * ptr = (float*)array_ptr;
         // call pure C++ function
-        int status = rocalCopyToOutputTensor32(context, ptr, tensor_format, multiplier0,
+        int status = rocalToTensor32(context, ptr, tensor_format, multiplier0,
                                               multiplier1, multiplier2, offset0,
-                                              offset1, offset2, reverse_channels);
+                                              offset1, offset2, reverse_channels, output_mem_type);
         // std::cerr<<"\n Copy failed with status :: "<<status;
         return py::cast<py::none>(Py_None);
     }
@@ -166,30 +166,30 @@ namespace rocal{
                                 RocalTensorLayout tensor_format, float multiplier0,
                                 float multiplier1, float multiplier2, float offset0,
                                 float offset1, float offset2,
-                                bool reverse_channels)
+                                bool reverse_channels, RocalOutputMemType output_mem_type)
     {
         float16 * ptr = (float16*)array_ptr;
         // call pure C++ function
-        int status = rocalCopyToOutputTensor16(context, ptr, tensor_format, multiplier0,
+        int status = rocalToTensor16(context, ptr, tensor_format, multiplier0,
                                               multiplier1, multiplier2, offset0,
-                                              offset1, offset2, reverse_channels);
+                                              offset1, offset2, reverse_channels, output_mem_type);
         // std::cerr<<"\n Copy failed with status :: "<<status;
         return py::cast<py::none>(Py_None);
     }
 
-    py::object wrapper_label_copy(RocalContext context, py::object p)
+    py::object wrapper_label_copy(RocalContext context, py::object p, RocalOutputMemType output_mem_type)
     {
         auto ptr = ctypes_void_ptr(p);
         // call pure C++ function
-        rocalGetImageLabels(context,ptr);
+        rocalGetImageLabels(context,ptr, output_mem_type);
         return py::cast<py::none>(Py_None);
     }
 
-    py::object wrapper_cupy_label_copy(RocalContext context, size_t array_ptr)
+    py::object wrapper_cupy_label_copy(RocalContext context, size_t array_ptr, RocalOutputMemType output_mem_type)
     {
         void * ptr = (void*)array_ptr;
         // call pure C++ function
-        rocalGetImageLabels(context,ptr);
+        rocalGetImageLabels(context,ptr, output_mem_type);
         return py::cast<py::none>(Py_None);
     }
 
@@ -280,6 +280,14 @@ namespace rocal{
         return py::cast<py::none>(Py_None);
     }
 
+    py::object wrapper_cupy_one_hot_label_copy(RocalContext context, size_t array_ptr, unsigned numOfClasses, int dest)
+    {
+        void * ptr = (void*) array_ptr;
+        // call pure C++ function
+        rocalGetOneHotImageLabels(context, ptr, numOfClasses, dest);
+        return py::cast<py::none>(Py_None);
+    }
+
     py::object wrapper_random_bbox_crop(RocalContext context, bool all_boxes_overlap, bool no_crop, RocalFloatParam p_aspect_ratio, bool has_shape, int crop_width, int crop_height, int num_attempts, RocalFloatParam p_scaling, int total_num_attempts )
     {
         // call pure C++ function
@@ -325,6 +333,11 @@ namespace rocal{
             .value("FLOAT",ROCAL_FP32)
             .value("FLOAT16",ROCAL_FP16)
             .value("UINT8",ROCAL_U8)
+            .export_values();
+        py::enum_<RocalOutputMemType>(types_m, "RocalOutputMemType", "Output memory types")
+            .value("CPU_MEMORY", ROCAL_MEMCPY_HOST)
+            .value("GPU_MEMORY", ROCAL_MEMCPY_GPU)
+            .value("PINNED_MEMORY", ROCAL_MEMCPY_PINNED)
             .export_values();
         py::enum_<RocalResizeScalingMode>(types_m,"RocalResizeScalingMode","Decode size policies")
             .value("SCALING_MODE_DEFAULT",ROCAL_SCALING_MODE_DEFAULT)
@@ -402,6 +415,7 @@ namespace rocal{
         m.def("getImgSizes",&wrapper_img_sizes_copy);
         m.def("getBoundingBoxCount",&wrapper_labels_BB_count_copy);
         m.def("getOneHotEncodedLabels",&wrapper_one_hot_label_copy);
+        m.def("getCupyOneHotEncodedLabels",&wrapper_cupy_one_hot_label_copy);
         m.def("isEmpty",&rocalIsEmpty);
         m.def("BoxEncoder",&rocalBoxEncoder);
         m.def("getTimingInfo",rocalGetTimingInfo);
@@ -424,11 +438,11 @@ namespace rocal{
         m.def("GetFloatValue",&rocalGetFloatValue);
         // rocal_api_data_transfer.h
         m.def("rocalCopyToOutput",&wrapper_copy_to_output);
-        m.def("rocalCopyToOutputTensor",&wrapper_tensor);
-        m.def("rocalCopyToOutputTensor32",&wrapper_tensor32);
-        m.def("rocalCopyToOutputTensor16",&wrapper_tensor16);
-        m.def("rocalCopyCupyToOutputTensor32",&wrapper_copy_cupy_tensor32);
-        m.def("rocalCopyCupyToOutputTensor16",&wrapper_copy_cupy_tensor16);
+        m.def("rocalToTensor",&wrapper_tensor);
+        m.def("rocalToTensor32",&wrapper_tensor32);
+        m.def("rocalToTensor16",&wrapper_tensor16);
+        m.def("rocalCupyToTensor32",&wrapper_copy_cupy_tensor32);
+        m.def("rocalCupyToTensor16",&wrapper_copy_cupy_tensor16);
         // rocal_api_data_loaders.h
         m.def("COCO_ImageDecoderSlice",&rocalJpegCOCOFileSourcePartial,"Reads file from the source given and decodes it according to the policy",
             py::return_value_policy::reference);

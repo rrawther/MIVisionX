@@ -23,7 +23,7 @@ This application shows how to run tiny yolov2 (20 classes) with MIVisionX RunTim
 
 ### Step 1. Get ONNX model
 
-Train your YoloV2 ONNX model or get it from [onnx github](https://github.com/onnx/models/tree/master/tiny_yolov2).
+Train your YoloV2 ONNX model or get it from [onnx github](https://github.com/onnx/models/tree/main/validated/vision/object_detection_segmentation/tiny-yolov2).
 ONNX version 1.3 is recommended.
 
 ### Step 2. Build the app using MIVisionX_winml_YoloV2.sln on Visual Studio.
@@ -62,7 +62,7 @@ Lower the confidence level if the detection is not good enough.
 ```
 
 <p align="center">
- <img src="./image/cat-yolo.jpg">
+ <img src="https://raw.githubusercontent.com/ROCm/MIVisionX/master/apps/mivisionx_winml_yolov2/image/cat-yolo.jpg">
 </p>
 
 ### Update parameters

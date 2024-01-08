@@ -24,7 +24,7 @@
 #
 ################################################################################
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 
 project(image_augmentation)
 
@@ -46,6 +46,7 @@ find_package(OpenCV QUIET)
 find_package(AMDRPP QUIET)
 
 # Application Includes & Libraries
+include_directories(${ROCM_PATH}/${CMAKE_INSTALL_INCLUDEDIR})
 include_directories(${ROCM_PATH}/${CMAKE_INSTALL_INCLUDEDIR}/mivisionx ${ROCM_PATH}/${CMAKE_INSTALL_INCLUDEDIR}/mivisionx/rocal)
 link_directories(${ROCM_PATH}/${CMAKE_INSTALL_LIBDIR})
 
@@ -78,4 +79,4 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mf16c -Wall ")
 target_link_libraries(${PROJECT_NAME} rocal ${OpenCV_LIBRARIES} )
 
 # Install Application in ROCm Bin Directory
-install(TARGETS ${PROJECT_NAME} DESTINATION ${ROCM_PATH}/${CMAKE_INSTALL_BINDIR})
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)

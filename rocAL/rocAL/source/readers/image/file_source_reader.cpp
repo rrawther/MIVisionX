@@ -22,14 +22,18 @@ THE SOFTWARE.
 
 #include <cassert>
 #include <algorithm>
+#include <cstring>
 #include <commons.h>
 #include "file_source_reader.h"
-#include <boost/filesystem.hpp>
+#ifdef USE_STD_FILESYSTEM
+#include <filesystem>
+namespace filesys = std::filesystem;
+#elif defined(USE_EXP_FILESYSTEM)
+#include <experimental/filesystem>
+namespace filesys = std::experimental::filesystem;
+#endif
 
-namespace filesys = boost::filesystem;
-
-FileSourceReader::FileSourceReader():
-_shuffle_time("shuffle_time", DBG_TIMING)
+FileSourceReader::FileSourceReader()
 {
     _src_dir = nullptr;
     _sub_dir = nullptr;
@@ -73,12 +77,10 @@ Reader::Status FileSourceReader::initialize(ReaderConfig desc)
         }
     }
     //shuffle dataset if set
-    _shuffle_time.start();
     if( ret==Reader::Status::OK && _shuffle)
         std::random_shuffle(_file_names.begin(), _file_names.end());
-    _shuffle_time.end();
-    return ret;
 
+    return ret;
 }
 
 void FileSourceReader::incremenet_read_ptr()
@@ -152,9 +154,7 @@ FileSourceReader::release()
 
 void FileSourceReader::reset()
 {
-    _shuffle_time.start();
     if (_shuffle) std::random_shuffle(_file_names.begin(), _file_names.end());
-    _shuffle_time.end();
     _read_counter = 0;
     _curr_file_idx = 0;
 }
@@ -182,11 +182,13 @@ Reader::Status FileSourceReader::subfolder_reading()
         filesys::path pathObj(subfolder_path);
         if(filesys::exists(pathObj) && filesys::is_regular_file(pathObj))
         {
-            // ignore files with extensions .tar, .zip, .7z
+            // ignore files with non-image extensions
             auto file_extension_idx = subfolder_path.find_last_of(".");
             if (file_extension_idx  != std::string::npos) {
                 std::string file_extension = subfolder_path.substr(file_extension_idx+1);
-                if ((file_extension == "tar") || (file_extension == "zip") || (file_extension == "7z") || (file_extension == "rar"))
+                std::transform(file_extension.begin(), file_extension.end(), file_extension.begin(),
+                    [](unsigned char c){ return std::tolower(c); });
+                if ((file_extension != "jpg") && (file_extension != "jpeg") && (file_extension != "png") && (file_extension != "ppm") && (file_extension != "bmp") && (file_extension != "pgm") && (file_extension != "tif") && (file_extension != "tiff") && (file_extension != "webp"))
                     continue;
             }
             ret = open_folder();
@@ -234,6 +236,15 @@ Reader::Status FileSourceReader::open_folder()
         if(_entity->d_type != DT_REG)
             continue;
 
+        std::string filename(_entity->d_name);
+        auto file_extension_idx = filename.find_last_of(".");
+        if (file_extension_idx  != std::string::npos) {
+            std::string file_extension = filename.substr(file_extension_idx+1);
+            std::transform(file_extension.begin(), file_extension.end(), file_extension.begin(),
+                [](unsigned char c){ return std::tolower(c); });
+            if ((file_extension != "jpg") && (file_extension != "jpeg") && (file_extension != "png") && (file_extension != "ppm") && (file_extension != "bmp") && (file_extension != "pgm") && (file_extension != "tif") && (file_extension != "tiff") && (file_extension != "webp"))
+                continue;
+        }        
         if(get_file_shard_id() != _shard_id )
         {
             _file_count_all_shards++;
@@ -245,13 +256,14 @@ Reader::Status FileSourceReader::open_folder()
         std::string file_path = _folder_path;
         file_path.append("/");
         file_path.append(_entity->d_name);
-        _last_file_name = file_path;
         _file_names.push_back(file_path);
         _file_count_all_shards++;
         incremenet_file_id();
     }
     if(_file_names.empty())
         WRN("FileReader ShardID ["+ TOSTR(_shard_id)+ "] Did not load any file from " + _folder_path)
+    std::sort(_file_names.begin(), _file_names.end());
+    _last_file_name = _file_names[_file_names.size()-1];
 
     closedir(_src_dir);
     return Reader::Status::OK;

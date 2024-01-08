@@ -297,10 +297,6 @@ def resize_mirror_normalize(*inputs, bytes_per_sample_hint=0, resize_min=0, resi
     kwargs_pybind = {"input_image0": inputs[0], "resize_min":resize_min, "resize_max":resize_max, "mean":mean, "std_dev":std,
                      "is_output": False, "mirror": mirror}
     rmn = b.ResizeMirrorNormalize(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
-    Pipeline._current_pipeline._tensor_layout = output_layout
-    Pipeline._current_pipeline._tensor_dtype = output_dtype
-    Pipeline._current_pipeline._multiplier = list(map(lambda x: 1/x ,std))
-    Pipeline._current_pipeline._offset = list(map(lambda x,y: -(x/y), mean, std))
     return (rmn)
 
 def random_crop(*inputs, crop_area_factor=[0.08, 1], crop_aspect_ratio=[0.75, 1.333333],
@@ -447,10 +443,6 @@ def crop_mirror_normalize(*inputs, bytes_per_sample_hint=0, crop=[0, 0], crop_d=
     kwargs_pybind = {"input_image0": inputs[0], "crop_depth":crop_depth, "crop_height":crop_height, "crop_width":crop_width, "start_x":crop_pos_x, "start_y":crop_pos_y, "start_z":crop_pos_z, "mean":mean, "std_dev":std,
                      "is_output": False, "mirror": mirror}
     cmn = b.CropMirrorNormalize(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
-    Pipeline._current_pipeline._tensor_layout = output_layout
-    Pipeline._current_pipeline._tensor_dtype = output_dtype
-    Pipeline._current_pipeline._multiplier = list(map(lambda x: 1/x ,std))
-    Pipeline._current_pipeline._offset = list(map(lambda x,y: -(x/y), mean, std))
     return (cmn)
 
 def centre_crop(*inputs, bytes_per_sample_hint=0, crop=[100, 100], crop_d=1, crop_h= 0, crop_pos_x = 0.5, crop_pos_y = 0.5, crop_pos_z = 0.5,

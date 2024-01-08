@@ -25,15 +25,19 @@ THE SOFTWARE.
 #include <commons.h>
 #include "coco_meta_data_reader.h"
 #include "coco_file_source_reader.h"
-#include <boost/filesystem.hpp>
+#ifdef USE_STD_FILESYSTEM
+#include <filesystem>
+namespace filesys = std::filesystem;
+#elif defined(USE_EXP_FILESYSTEM)
+#include <experimental/filesystem>
+namespace filesys = std::experimental::filesystem;
+#endif
 #include "meta_data_reader_factory.h"
 #include "meta_data_graph_factory.h"
 
-namespace filesys = boost::filesystem;
 #define USE_STDIO_FILE 0
 
-COCOFileSourceReader::COCOFileSourceReader():
-_shuffle_time("shuffle_time", DBG_TIMING)
+COCOFileSourceReader::COCOFileSourceReader()
 {
     _src_dir = nullptr;
     _sub_dir = nullptr;
@@ -88,10 +92,8 @@ Reader::Status COCOFileSourceReader::initialize(ReaderConfig desc)
         }
     }
     //shuffle dataset if set
-    _shuffle_time.start();
     if (ret == Reader::Status::OK && _shuffle)
         std::random_shuffle(_file_names.begin(), _file_names.end());
-    _shuffle_time.end();
     return ret;
 }
 
@@ -273,7 +275,6 @@ Reader::Status COCOFileSourceReader::open_folder()
             std::string file_path = _folder_path;
             file_path.append("/");
             file_path.append(_entity->d_name);
-            _last_file_name = file_path;
             _file_names.push_back(file_path);
             _file_count_all_shards++;
             incremenet_file_id();
@@ -281,6 +282,8 @@ Reader::Status COCOFileSourceReader::open_folder()
     }
     if (_file_names.empty())
         WRN("FileReader ShardID [" + TOSTR(_shard_id) + "] Did not load any file from " + _folder_path)
+    std::sort(_file_names.begin(), _file_names.end());
+    _last_file_name = _file_names[_file_names.size()-1];
 
     closedir(_src_dir);
     return Reader::Status::OK;

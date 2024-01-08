@@ -35,8 +35,8 @@ The following is a list of RPP functions that have been included in the vx_rpp m
 ### Pre-requisites
 
 * AMD OpenVX&trade; library
-* [AMD RPP library](https://github.com/GPUOpen-ProfessionalCompute-Libraries/rpp)
-* CMake 3.0 or later
+* [AMD RPP library](https://github.com/ROCm/rpp)
+* CMake 3.5 or later
 * OpenCL (optional)
 
 ### Build using CMake on Linux

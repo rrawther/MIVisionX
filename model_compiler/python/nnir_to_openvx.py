@@ -109,7 +109,7 @@ def generateCMakeFiles(graph,outputFolder):
         generateLicenseForScript(f)
         f.write( \
 """
-cmake_minimum_required (VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 
 project (annmodule)
 
@@ -147,8 +147,7 @@ if (OPENVX_BACKEND_OPENCL_FOUND)
     include_directories(${OpenCL_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS}/Headers )
 endif()
 
-include_directories(${ROCM_PATH}/include/mivisionx)
-
+include_directories(${ROCM_PATH}/include ${ROCM_PATH}/include/mivisionx)
 link_directories(${ROCM_PATH}/lib)
 
 list(APPEND SOURCES annmodule.cpp)
@@ -385,7 +384,7 @@ static vx_status initializeTensor(vx_context context, vx_tensor tensor, FILE * f
     vx_uint32 h[2] = { 0 };
     fread(h, 1, sizeof(h), fp);
     if(h[0] != 0xf00dd1e1 || (vx_size)h[1] != (count*itemsize)) {
-      vxAddLogEntry((vx_reference)tensor, VX_FAILURE, "ERROR: invalid data (magic,size)=(0x%x,%d) in %%s at byte position %d -- expected size is %ld\\n", h[0], h[1], binaryFilename, ftell(fp)-sizeof(h), count*itemsize);
+      vxAddLogEntry((vx_reference)tensor, VX_FAILURE, "ERROR: invalid data (magic,size)=(0x%x,%d) in %s at byte position %d -- expected size is %ld\\n", h[0], h[1], binaryFilename, ftell(fp)-sizeof(h), count*itemsize);
       return VX_FAILURE;
     }
 
@@ -2092,7 +2091,7 @@ static vx_status copyTensor(std::string tensorName, vx_tensor tensor, std::strin
         {
             for(size_t n = 0; n < dims[3]; n++) {
                 char imgFileName[1024];
-                sprintf(imgFileName, fileName.c_str(), (int)n);
+                snprintf(imgFileName, sizeof(imgFileName), fileName.c_str(), (int)n);
                 Mat img;
                 img = imread(imgFileName, CV_LOAD_IMAGE_COLOR);
                 if(!img.data || img.rows != dims[1] || img.cols != dims[0]) {
@@ -2274,7 +2273,7 @@ static vx_status copyTensor(std::string tensorName, vx_tensor tensor, std::strin
         {
             for(size_t n = 0; n < N; n++) {
                 char imgFileName[1024];
-                sprintf(imgFileName, fileName.c_str(), (int)n);
+                snprintf(imgFileName, sizeof(imgFileName), fileName.c_str(), (int)n);
                 Mat img(dims[1], dims[0], %s);
                 if(!img.data || img.rows != H || img.cols != W) {
                     printf("ERROR: invalid image or dimensions: %%s\\n", imgFileName);

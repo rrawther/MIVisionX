@@ -25,7 +25,7 @@ THE SOFTWARE.
 #include <string>
 #include <memory>
 #include <dirent.h>
-#include "reader.h"
+#include "image_reader.h"
 
 
 class CIFAR10DataReader : public Reader {
@@ -62,7 +62,6 @@ public:
     CIFAR10DataReader();
 
     unsigned get_file_index() { return _last_file_idx;}
-    unsigned long long get_shuffle_time() override {return 0;}
 
 private:
     //! opens the folder containing the images

@@ -105,7 +105,7 @@ def main():
         elif augmentation_name == "fish_eye":
             output = fn.fish_eye(images)
         elif augmentation_name == "vignette":
-            output = fn.vignette(images)
+            output = fn.vignette(images, vignette=50.0)
         elif augmentation_name == "jitter":
             output = fn.jitter(images)
         elif augmentation_name == "snp_noise":
@@ -128,8 +128,8 @@ def main():
             output = fn.color_twist(images)
         elif augmentation_name == "crop_mirror_normalize":
             output = fn.crop_mirror_normalize(images, device="cpu",
-                                              output_dtype=types.FLOAT16 if args.fp16 else types.FLOAT,
-                                              output_layout=types.NHWC if args.NHWC else types.NCHW,
+                                              output_dtype=types.UINT8,
+                                              output_layout=types.NHWC,
                                               crop=(300, 300),
                                               image_type=types.RGB,
                                               mean=[0, 0, 0],
@@ -137,8 +137,8 @@ def main():
         elif augmentation_name == "resize_mirror_normalize":
             output = fn.resize_mirror_normalize(images,
                                             device="gpu",
-                                            output_dtype=types.FLOAT16 if args.fp16 else types.FLOAT,
-                                            output_layout=types.NHWC if args.NHWC else types.NCHW,
+                                            output_dtype=types.UINT8,
+                                            output_layout=types.NHWC,
                                             resize_min = 1344,
                                             resize_max = 1344,
                                             image_type=types.RGB,
@@ -165,7 +165,7 @@ def main():
             pipe.set_outputs(output1, output2, output3)
             output_set = 1
         elif augmentation_name == "vignetter_blur":
-            output1 = fn.vignette(images)
+            output1 = fn.vignette(images, vignette=50.0)
             output2 = fn.blur(output1)
             pipe.set_outputs(output1, output2)
             output_set = 1

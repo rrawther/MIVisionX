@@ -18,16 +18,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-cmake_minimum_required(VERSION 3.0)
-project(vx_rpp)
+cmake_minimum_required(VERSION 3.5)
+set(VERSION "1.0.0")
+project(vx_rpp VERSION ${VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../amd_openvx/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake)
 
 find_package(AMDRPP REQUIRED)
-set(BOOST_COMPONENTS filesystem system)
-find_package(Boost COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
 
 if(GPU_SUPPORT AND "${BACKEND}" STREQUAL "OPENCL")
     find_package(OpenCL REQUIRED)
@@ -41,93 +40,123 @@ include_directories(../../amd_openvx/openvx/include/ include)
 # AMD RPP
 include_directories(${AMDRPP_INCLUDE_DIRS})
 set(LINK_LIBRARY_LIST ${LINK_LIBRARY_LIST} ${AMDRPP_LIBRARIES})
-# BOOST
-include_directories(${Boost_INCLUDE_DIRS})
-set(LINK_LIBRARY_LIST ${LINK_LIBRARY_LIST} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY})
 
 list(APPEND SOURCES
-        source/AbsoluteDifferencebatchPD.cpp
-        source/AccumulatebatchPD.cpp
-        source/AccumulateSquaredbatchPD.cpp
-        source/AccumulateWeightedbatchPD.cpp
-        source/AddbatchPD.cpp
-        source/BitwiseANDbatchPD.cpp
-        source/BitwiseNOTbatchPD.cpp
-        source/BlendbatchPD.cpp
-        source/BlurbatchPD.cpp
-        source/BoxFilterbatchPD.cpp
-        source/BrightnessbatchPD.cpp
-        source/CannyEdgeDetector.cpp
-        source/ChannelCombinebatchPD.cpp
-        source/ChannelExtractbatchPD.cpp
-        source/ColorTemperaturebatchPD.cpp
-        source/ColorTwistbatchPD.cpp
-        source/ContrastbatchPD.cpp
-        source/copy.cpp
-        source/CropMirrorNormalizePD.cpp
-        source/CropPD.cpp
-        source/CustomConvolutionbatchPD.cpp
-        source/DataObjectCopybatchPD.cpp
-        source/DilatebatchPD.cpp
-        source/ErodebatchPD.cpp
-        source/ExclusiveORbatchPD.cpp
-        source/ExposurebatchPD.cpp
-        source/FastCornerDetector.cpp
-        source/FisheyebatchPD.cpp
-        source/FlipbatchPD.cpp
-        source/FogbatchPD.cpp
-        source/GammaCorrectionbatchPD.cpp
-        source/GaussianFilterbatchPD.cpp
-        source/GaussianImagePyramidbatchPD.cpp
-        source/HarrisCornerDetector.cpp
-        source/Histogram.cpp
-        source/HistogramBalancebatchPD.cpp
-        source/HistogramEqualizebatchPD.cpp
-        source/HuebatchPD.cpp
-        source/InclusiveORbatchPD.cpp
-        source/JitterbatchPD.cpp
-        source/LaplacianImagePyramid.cpp
-        source/LensCorrectionbatchPD.cpp
-        source/LocalBinaryPatternbatchPD.cpp
-        source/LookUpTablebatchPD.cpp
-        source/MagnitudebatchPD.cpp
-        source/MaxbatchPD.cpp
-        source/MeanStddev.cpp
-        source/MedianFilterbatchPD.cpp
-        source/MinbatchPD.cpp
-        source/MinMaxLoc.cpp
-        source/MultiplybatchPD.cpp
-        source/NoisebatchPD.cpp
-        source/NonLinearFilterbatchPD.cpp
-        source/NonMaxSupressionbatchPD.cpp
-        source/nop.cpp
-        source/PhasebatchPD.cpp
-        source/PixelatebatchPD.cpp
-        source/RainbatchPD.cpp
-        source/RandomCropLetterBoxbatchPD.cpp
-        source/RandomShadowbatchPD.cpp
-        source/Remap.cpp
-        source/ResizebatchPD.cpp
-        source/Resizetensor.cpp
-        source/ResizeCropbatchPD.cpp
-        source/ResizeCropMirrorPD.cpp
-        source/ResizeMirrorNormalizeTensor.cpp
-        source/RotatebatchPD.cpp
-        source/SaturationbatchPD.cpp
-        source/ScalebatchPD.cpp
-        source/SequenceRearrange.cpp
-        source/SnowbatchPD.cpp
-        source/SobelbatchPD.cpp
-        source/SubtractbatchPD.cpp
-        source/TensorAdd.cpp
-        source/TensorLookup.cpp
-        source/TensorMatrixMultiply.cpp
-        source/TensorMultiply.cpp
-        source/TensorSubtract.cpp
-        source/ThresholdingbatchPD.cpp
-        source/VignettebatchPD.cpp
-        source/WarpAffinebatchPD.cpp
-        source/WarpPerspectivebatchPD.cpp
+        source/image/AbsoluteDifferencebatchPD.cpp
+        source/image/AccumulatebatchPD.cpp
+        source/image/AccumulateSquaredbatchPD.cpp
+        source/image/AccumulateWeightedbatchPD.cpp
+        source/image/AddbatchPD.cpp
+        source/image/BitwiseANDbatchPD.cpp
+        source/image/BitwiseNOTbatchPD.cpp
+        source/image/BlendbatchPD.cpp
+        source/image/BlurbatchPD.cpp
+        source/image/BoxFilterbatchPD.cpp
+        source/image/BrightnessbatchPD.cpp
+        source/image/CannyEdgeDetector.cpp
+        source/image/ChannelCombinebatchPD.cpp
+        source/image/ChannelExtractbatchPD.cpp
+        source/image/ColorTemperaturebatchPD.cpp
+        source/image/ColorTwistbatchPD.cpp
+        source/image/ContrastbatchPD.cpp
+        source/image/CopybatchPD.cpp
+        source/image/CropMirrorNormalizePD.cpp
+        source/image/CropPD.cpp
+        source/image/CustomConvolutionbatchPD.cpp
+        source/image/DataObjectCopybatchPD.cpp
+        source/image/DilatebatchPD.cpp
+        source/image/ErodebatchPD.cpp
+        source/image/ExclusiveORbatchPD.cpp
+        source/image/ExposurebatchPD.cpp
+        source/image/FastCornerDetector.cpp
+        source/image/FisheyebatchPD.cpp
+        source/image/FlipbatchPD.cpp
+        source/image/FogbatchPD.cpp
+        source/image/GammaCorrectionbatchPD.cpp
+        source/image/GaussianFilterbatchPD.cpp
+        source/image/GaussianImagePyramidbatchPD.cpp
+        source/image/HarrisCornerDetector.cpp
+        source/image/Histogram.cpp
+        source/image/HistogramBalancebatchPD.cpp
+        source/image/HistogramEqualizebatchPD.cpp
+        source/image/HuebatchPD.cpp
+        source/image/InclusiveORbatchPD.cpp
+        source/image/JitterbatchPD.cpp
+        source/image/LaplacianImagePyramid.cpp
+        source/image/LensCorrectionbatchPD.cpp
+        source/image/LocalBinaryPatternbatchPD.cpp
+        source/image/LookUpTablebatchPD.cpp
+        source/image/MagnitudebatchPD.cpp
+        source/image/MaxbatchPD.cpp
+        source/image/MeanStddev.cpp
+        source/image/MedianFilterbatchPD.cpp
+        source/image/MinbatchPD.cpp
+        source/image/MinMaxLoc.cpp
+        source/image/MultiplybatchPD.cpp
+        source/image/NoisebatchPD.cpp
+        source/image/NonLinearFilterbatchPD.cpp
+        source/image/NonMaxSupressionbatchPD.cpp
+        source/image/NopbatchPD.cpp
+        source/image/PhasebatchPD.cpp
+        source/image/PixelatebatchPD.cpp
+        source/image/RainbatchPD.cpp
+        source/image/RandomCropLetterBoxbatchPD.cpp
+        source/image/RandomShadowbatchPD.cpp
+        source/image/Remap.cpp
+        source/image/ResizebatchPD.cpp
+        source/image/ResizeCropbatchPD.cpp
+        source/image/ResizeCropMirrorPD.cpp
+        source/image/ResizeMirrorNormalizeTensor.cpp
+        source/image/Resizetensor.cpp
+        source/image/RotatebatchPD.cpp
+        source/image/SaturationbatchPD.cpp
+        source/image/ScalebatchPD.cpp
+        source/image/SequenceRearrangebatchPD.cpp
+        source/image/SnowbatchPD.cpp
+        source/image/SobelbatchPD.cpp
+        source/image/SubtractbatchPD.cpp
+        source/image/TensorAdd.cpp
+        source/image/TensorLookup.cpp
+        source/image/TensorMatrixMultiply.cpp
+        source/image/TensorMultiply.cpp
+        source/image/TensorSubtract.cpp
+        source/image/ThresholdingbatchPD.cpp
+        source/image/VignettebatchPD.cpp
+        source/image/WarpAffinebatchPD.cpp
+        source/image/WarpPerspectivebatchPD.cpp
+        source/tensor/Blend.cpp
+        source/tensor/Blur.cpp
+        source/tensor/Brightness.cpp
+        source/tensor/ColorTemperature.cpp
+        source/tensor/ColorTwist.cpp
+        source/tensor/Contrast.cpp
+        source/tensor/Copy.cpp
+        source/tensor/Crop.cpp
+        source/tensor/CropMirrorNormalize.cpp
+        source/tensor/Exposure.cpp
+        source/tensor/FishEye.cpp
+        source/tensor/Flip.cpp
+        source/tensor/Fog.cpp
+        source/tensor/GammaCorrection.cpp
+        source/tensor/Glitch.cpp
+        source/tensor/Hue.cpp
+        source/tensor/Jitter.cpp
+        source/tensor/LensCorrection.cpp
+        source/tensor/Noise.cpp
+        source/tensor/Nop.cpp
+        source/tensor/Rotate.cpp
+        source/tensor/Pixelate.cpp
+        source/tensor/Rain.cpp
+        source/tensor/Resize.cpp
+        source/tensor/ResizeCrop.cpp
+        source/tensor/ResizeCropMirror.cpp
+        source/tensor/ResizeMirrorNormalize.cpp
+        source/tensor/Saturation.cpp
+        source/tensor/SequenceRearrange.cpp
+        source/tensor/Snow.cpp
+        source/tensor/Vignette.cpp
+        source/tensor/WarpAffine.cpp
+        source/tensor/SequenceRearrange.cpp
         source/kernel_rpp.cpp
         source/internal_publishKernels.cpp
     )
@@ -175,10 +204,11 @@ endif()
 target_link_libraries(vx_rpp ${LINK_LIBRARY_LIST})
 message("-- ${White}vx_rpp -- Link Libraries:${LINK_LIBRARY_LIST}${ColourReset}")
 message("-- ${White}vx_rpp -- CMAKE_CXX_FLAGS:${CMAKE_CXX_FLAGS}${ColourReset}")
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
 
 # install MIVisionX libs -- {ROCM_PATH}/lib
-install(TARGETS vx_rpp DESTINATION ${CMAKE_INSTALL_LIBDIR})
-if(BUILD_DEV)
-    # install MIVisionX include files -- {ROCM_PATH}/include/mivisionx/
-    install(FILES include/vx_ext_rpp.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mivisionx)
-endif(BUILD_DEV)
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime NAMELINK_SKIP)
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev NAMELINK_ONLY)
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT asan)
+# install MIVisionX include files -- {ROCM_PATH}/include/mivisionx/
+install(FILES include/vx_ext_rpp.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mivisionx COMPONENT dev)
